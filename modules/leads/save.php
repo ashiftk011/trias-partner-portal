@@ -18,6 +18,8 @@ $status      = $_POST['status'];
 $assignedTo  = $_POST['assigned_to'] ? (int)$_POST['assigned_to'] : null;
 $planId      = $_POST['interested_plan_id'] ? (int)$_POST['interested_plan_id'] : null;
 $notes       = trim($_POST['notes'] ?? '');
+$website     = trim($_POST['website'] ?? '');
+$address     = trim($_POST['address'] ?? '');
 
 if (!$name || !$phone || !$projectId) {
     setFlash('error', 'Name, phone and project are required.');
@@ -25,13 +27,13 @@ if (!$name || !$phone || !$projectId) {
 }
 
 if ($id > 0) {
-    $db->prepare("UPDATE leads SET project_id=?,region_id=?,name=?,email=?,phone=?,company=?,designation=?,source=?,status=?,assigned_to=?,interested_plan_id=?,notes=?,updated_at=NOW() WHERE id=?")
-       ->execute([$projectId,$regionId,$name,$email,$phone,$company,$designation,$source,$status,$assignedTo,$planId,$notes,$id]);
+    $db->prepare("UPDATE leads SET project_id=?,region_id=?,name=?,email=?,phone=?,company=?,designation=?,website=?,address=?,source=?,status=?,assigned_to=?,interested_plan_id=?,notes=?,updated_at=NOW() WHERE id=?")
+       ->execute([$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$notes,$id]);
     setFlash('success', 'Lead updated successfully.');
 } else {
     $code = generateCode('LD', 'leads', 'lead_code');
-    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,source,status,assigned_to,interested_plan_id,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-       ->execute([$code,$projectId,$regionId,$name,$email,$phone,$company,$designation,$source,$status,$assignedTo,$planId,$notes]);
+    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,website,address,source,status,assigned_to,interested_plan_id,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+       ->execute([$code,$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$notes]);
     setFlash('success', 'Lead added successfully. Code: ' . $code);
 }
 

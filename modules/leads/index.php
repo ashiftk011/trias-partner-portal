@@ -4,9 +4,11 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('leads');
 
 $db = getDB();
+$isInvestor = isRole('investor');
+$investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
 
 // Filters
-$filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+$filterProject = $isInvestor ? $investorProjectId : (isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0);
 $filterStatus  = $_GET['status'] ?? '';
 $filterRegion  = isset($_GET['region_id']) ? (int)$_GET['region_id'] : 0;
 $filterSearch  = trim($_GET['q'] ?? '');
@@ -41,9 +43,16 @@ include __DIR__ . '/../../includes/header.php';
 
 <div class="page-header d-flex justify-content-between align-items-center mb-3">
   <div><h4 class="mb-0">Leads</h4><p class="text-muted small mb-0">Track and manage all leads</p></div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal">
-    <i class="bi bi-plus-circle me-1"></i> Add Lead
-  </button>
+  <?php if (!$isInvestor): ?>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#csvModal">
+      <i class="bi bi-file-earmark-arrow-up me-1"></i>Import CSV
+    </button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal">
+      <i class="bi bi-plus-circle me-1"></i> Add Lead
+    </button>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php displayFlash(); ?>
@@ -72,12 +81,17 @@ include __DIR__ . '/../../includes/header.php';
         <input type="text" name="q" class="form-control form-control-sm" placeholder="Search name, phone, company..." value="<?= htmlspecialchars($filterSearch) ?>">
       </div>
       <div class="col-md-2">
+        <?php if ($isInvestor): ?>
+          <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
+          <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[array_search($investorProjectId, array_column($projects, 'id'))]['name'] ?? 'My Project') ?>" disabled>
+        <?php else: ?>
         <select name="project_id" class="form-select form-select-sm">
           <option value="">All Projects</option>
           <?php foreach ($projects as $pr): ?>
           <option value="<?= $pr['id'] ?>" <?= $filterProject==$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
           <?php endforeach; ?>
         </select>
+        <?php endif; ?>
       </div>
       <div class="col-md-2">
         <select name="region_id" class="form-select form-select-sm">
@@ -134,9 +148,11 @@ include __DIR__ . '/../../includes/header.php';
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                <?php if (!$isInvestor): ?>
                 <button class="btn btn-outline-primary" onclick="editLead(<?= htmlspecialchars(json_encode($l)) ?>)" title="Edit"><i class="bi bi-pencil"></i></button>
                 <?php if ($l['status'] !== 'converted' && hasAccess('clients')): ?>
                 <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $l['id'] ?>" class="btn btn-outline-success" title="Convert to Client"><i class="bi bi-person-check"></i></a>
+                <?php endif; ?>
                 <?php endif; ?>
               </div>
             </td>
@@ -236,6 +252,14 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="">Not specified</option>
               </select>
             </div>
+            <div class="col-md-4">
+              <label class="form-label">Website</label>
+              <input type="url" name="website" id="lWebsite" class="form-control" placeholder="https://example.com">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Address</label>
+              <textarea name="address" id="lAddress" class="form-control" rows="2" placeholder="Street, City, State, Pincode"></textarea>
+            </div>
             <div class="col-12">
               <label class="form-label">Notes</label>
               <textarea name="notes" id="lNotes" class="form-control" rows="2"></textarea>
@@ -245,6 +269,36 @@ include __DIR__ . '/../../includes/header.php';
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Lead</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="csvModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="<?= BASE_URL ?>/modules/leads/import.php" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <div class="modal-header">
+          <h5 class="modal-title">Import Leads via CSV</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info small">
+            <strong>Required columns:</strong> <code>name, phone, project_code</code><br>
+            <strong>Optional columns:</strong> <code>email, company, designation, website, address, region_name, source, status, notes</code><br>
+            First row must be headers.
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">CSV File <span class="text-danger">*</span></label>
+            <input type="file" name="csv_file" class="form-control" accept=".csv,text/csv" required>
+          </div>
+          <a href="<?= BASE_URL ?>/modules/leads/sample.csv" class="small text-decoration-none"><i class="bi bi-download me-1"></i>Download sample CSV</a>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-upload me-1"></i>Upload & Import</button>
         </div>
       </form>
     </div>
@@ -273,6 +327,8 @@ function editLead(l) {
   document.getElementById('lEmail').value         = l.email || '';
   document.getElementById('lCompany').value       = l.company || '';
   document.getElementById('lDesignation').value   = l.designation || '';
+  document.getElementById('lWebsite').value       = l.website || '';
+  document.getElementById('lAddress').value       = l.address || '';
   document.getElementById('lSource').value        = l.source;
   document.getElementById('lStatus').value        = l.status;
   document.getElementById('lNotes').value         = l.notes || '';

@@ -8,15 +8,19 @@ if (strpos($currentPath, '/modules/') !== false) {
 }
 
 $navItems = [
-    ['module'=>'dashboard', 'icon'=>'speedometer2',     'label'=>'Dashboard',  'url'=>BASE_URL.'/modules/dashboard/index.php'],
-    ['module'=>'leads',     'icon'=>'funnel-fill',      'label'=>'Leads',      'url'=>BASE_URL.'/modules/leads/index.php'],
-    ['module'=>'clients',   'icon'=>'people-fill',      'label'=>'Clients',    'url'=>BASE_URL.'/modules/clients/index.php'],
-    ['module'=>'renewals',  'icon'=>'arrow-repeat',     'label'=>'Renewals',   'url'=>BASE_URL.'/modules/renewals/index.php'],
-    ['module'=>'invoices',  'icon'=>'receipt',          'label'=>'Invoices',   'url'=>BASE_URL.'/modules/invoices/index.php'],
-    ['module'=>'projects',  'icon'=>'folder2-open',     'label'=>'Projects',   'url'=>BASE_URL.'/modules/projects/index.php'],
-    ['module'=>'plans',     'icon'=>'clipboard-check',  'label'=>'Plans',      'url'=>BASE_URL.'/modules/plans/index.php'],
-    ['module'=>'users',     'icon'=>'person-gear',      'label'=>'Users',      'url'=>BASE_URL.'/modules/users/index.php'],
-    ['module'=>'settings',  'icon'=>'gear-fill',        'label'=>'Settings',   'url'=>BASE_URL.'/modules/settings/index.php'],
+    ['module'=>'dashboard', 'icon'=>'speedometer2',     'label'=>'Dashboard',   'url'=>BASE_URL.'/modules/dashboard/index.php'],
+    ['module'=>'leads',     'icon'=>'funnel-fill',      'label'=>'Leads',       'url'=>BASE_URL.'/modules/leads/index.php'],
+    ['module'=>'clients',   'icon'=>'people-fill',      'label'=>'Clients',     'url'=>BASE_URL.'/modules/clients/index.php'],
+    ['module'=>'proposals', 'icon'=>'file-earmark-text','label'=>'Proposals',   'url'=>BASE_URL.'/modules/proposals/index.php'],
+    ['module'=>'quotations','icon'=>'calculator',       'label'=>'Quotations',  'url'=>BASE_URL.'/modules/quotations/index.php'],
+    ['module'=>'demos',     'icon'=>'camera-video-fill','label'=>'Demos',       'url'=>BASE_URL.'/modules/demos/index.php'],
+    ['module'=>'renewals',  'icon'=>'arrow-repeat',     'label'=>'Renewals',    'url'=>BASE_URL.'/modules/renewals/index.php'],
+    ['module'=>'invoices',  'icon'=>'receipt',          'label'=>'Invoices',    'url'=>BASE_URL.'/modules/invoices/index.php'],
+    ['module'=>'projects',  'icon'=>'folder2-open',     'label'=>'Projects',    'url'=>BASE_URL.'/modules/projects/index.php'],
+    ['module'=>'plans',     'icon'=>'clipboard-check',  'label'=>'Plans',       'url'=>BASE_URL.'/modules/plans/index.php'],
+    ['module'=>'regions',   'icon'=>'geo-alt-fill',     'label'=>'Regions',     'url'=>BASE_URL.'/modules/regions/index.php'],
+    ['module'=>'users',     'icon'=>'person-gear',      'label'=>'Users',       'url'=>BASE_URL.'/modules/users/index.php'],
+    ['module'=>'settings',  'icon'=>'gear-fill',        'label'=>'Settings',    'url'=>BASE_URL.'/modules/settings/index.php'],
 ];
 
 ?>

@@ -5,13 +5,13 @@
 CREATE DATABASE IF NOT EXISTS trias_portal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE trias_portal;
 
--- Users (Admin, Finance, Telecall)
+-- Users (Admin, Finance, Telecall, Investor, CSM)
 CREATE TABLE users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'finance', 'telecall') DEFAULT 'telecall',
+    role ENUM('admin', 'finance', 'telecall', 'investor', 'csm') DEFAULT 'telecall',
     phone VARCHAR(20),
     status ENUM('active', 'inactive') DEFAULT 'active',
     last_login TIMESTAMP NULL,
@@ -62,6 +62,8 @@ CREATE TABLE leads (
     phone VARCHAR(20) NOT NULL,
     company VARCHAR(200),
     designation VARCHAR(100),
+    website VARCHAR(255),
+    address TEXT,
     source ENUM('website','referral','social_media','cold_call','email','exhibition','other') DEFAULT 'other',
     status ENUM('new','contacted','interested','not_interested','follow_up','converted') DEFAULT 'new',
     assigned_to INT,
@@ -217,3 +219,106 @@ INSERT INTO plans (project_id, region_id, name, price, duration_months, features
 (2, NULL, 'Social Basic', 8000.00, 6, '3 Platforms, 15 posts/month, Basic Analytics'),
 (2, NULL, 'Social Premium', 15000.00, 12, '5 Platforms, 30 posts/month, Ads Management'),
 (3, NULL, 'Website Starter', 25000.00, 0, '5 Page Website, Responsive, SEO Ready');
+
+-- Investor-Project Assignments
+CREATE TABLE investor_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL UNIQUE,
+    project_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- CSM Proposals
+CREATE TABLE proposals (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    proposal_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    valid_until DATE,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    discount DECIMAL(10,2) DEFAULT 0.00,
+    total_amount DECIMAL(10,2) DEFAULT 0.00,
+    status ENUM('draft','sent','accepted','rejected','expired') DEFAULT 'draft',
+    notes TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE proposal_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    proposal_id INT NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    quantity DECIMAL(10,2) DEFAULT 1.00,
+    unit_price DECIMAL(10,2) DEFAULT 0.00,
+    amount DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE
+);
+
+-- CSM Quotations
+CREATE TABLE quotations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    quotation_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    valid_until DATE,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    tax_percent DECIMAL(5,2) DEFAULT 18.00,
+    tax_amount DECIMAL(10,2) DEFAULT 0.00,
+    total_amount DECIMAL(10,2) DEFAULT 0.00,
+    status ENUM('draft','sent','accepted','rejected','expired') DEFAULT 'draft',
+    notes TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE quotation_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    quotation_id INT NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    quantity DECIMAL(10,2) DEFAULT 1.00,
+    unit_price DECIMAL(10,2) DEFAULT 0.00,
+    amount DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+);
+
+-- CSM Demo Scheduling
+CREATE TABLE demos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    demo_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    demo_type ENUM('online','onsite','phone') DEFAULT 'online',
+    scheduled_at DATETIME NOT NULL,
+    duration_mins INT DEFAULT 60,
+    meeting_link VARCHAR(500),
+    location TEXT,
+    status ENUM('scheduled','completed','cancelled','rescheduled') DEFAULT 'scheduled',
+    notes TEXT,
+    assigned_to INT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);

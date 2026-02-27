@@ -4,8 +4,10 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('clients');
 
 $db = getDB();
+$isInvestor = isRole('investor');
+$investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
 
-$filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+$filterProject = $isInvestor ? $investorProjectId : (isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0);
 $filterStatus  = $_GET['status'] ?? '';
 $filterSearch  = trim($_GET['q'] ?? '');
 
@@ -40,7 +42,7 @@ include __DIR__ . '/../../includes/header.php';
 
 <div class="page-header d-flex justify-content-between align-items-center mb-4">
   <div><h4 class="mb-0">Clients</h4><p class="text-muted small mb-0">All registered clients</p></div>
-  <?php if (currentUser()['role'] === 'admin'): ?>
+  <?php if (isRole('admin','csm')): ?>
   <a href="<?= BASE_URL ?>/modules/clients/save.php" class="btn btn-primary">
     <i class="bi bi-plus-circle me-1"></i>Add Client
   </a>
@@ -65,16 +67,21 @@ include __DIR__ . '/../../includes/header.php';
         <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by name, phone, company, code..." value="<?= htmlspecialchars($filterSearch) ?>">
       </div>
       <div class="col-md-3">
+        <?php if ($isInvestor): ?>
+          <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
+          <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[array_search($investorProjectId, array_column($projects, 'id'))]['name'] ?? 'My Project') ?>" disabled>
+        <?php else: ?>
         <select name="project_id" class="form-select form-select-sm">
           <option value="">All Projects</option>
           <?php foreach ($projects as $pr): ?>
           <option value="<?= $pr['id'] ?>" <?= $filterProject==$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
           <?php endforeach; ?>
         </select>
+        <?php endif; ?>
       </div>
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>Search</button>
-        <?php if ($filterSearch || $filterProject || $filterStatus): ?>
+        <?php if ($filterSearch || (!$isInvestor && $filterProject) || $filterStatus): ?>
         <a href="?" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
         <?php endif; ?>
       </div>
@@ -122,10 +129,14 @@ include __DIR__ . '/../../includes/header.php';
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="<?= BASE_URL ?>/modules/clients/view.php?id=<?= $c['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                <?php if (!$isInvestor): ?>
                 <a href="<?= BASE_URL ?>/modules/clients/save.php?id=<?= $c['id'] ?>" class="btn btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <?php if (isRole('admin')): ?>
                 <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $c['id'] ?>" class="btn btn-outline-secondary" title="Settings"><i class="bi bi-gear"></i></a>
+                <?php endif; ?>
                 <?php if (hasAccess('invoices')): ?>
                 <a href="<?= BASE_URL ?>/modules/invoices/index.php?client_id=<?= $c['id'] ?>" class="btn btn-outline-success" title="Invoices"><i class="bi bi-receipt"></i></a>
+                <?php endif; ?>
                 <?php endif; ?>
               </div>
             </td>

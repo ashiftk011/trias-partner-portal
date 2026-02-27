@@ -6,19 +6,34 @@ requireLogin();
 $pageTitle = 'Dashboard';
 $db = getDB();
 $user = currentUser();
+$isInvestor = isRole('investor');
+$investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
 
 // Stats
 $stats = [];
 
 if (hasAccess('leads')) {
-    $stats['total_leads']     = $db->query("SELECT COUNT(*) FROM leads")->fetchColumn();
-    $stats['new_leads']       = $db->query("SELECT COUNT(*) FROM leads WHERE status='new'")->fetchColumn();
-    $stats['converted_leads'] = $db->query("SELECT COUNT(*) FROM leads WHERE status='converted'")->fetchColumn();
-    $stats['follow_up_leads'] = $db->query("SELECT COUNT(*) FROM leads WHERE status='follow_up'")->fetchColumn();
+    if ($isInvestor && $investorProjectId) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=?"); $stmt->execute([$investorProjectId]); $stats['total_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='new'"); $stmt->execute([$investorProjectId]); $stats['new_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='converted'"); $stmt->execute([$investorProjectId]); $stats['converted_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='follow_up'"); $stmt->execute([$investorProjectId]); $stats['follow_up_leads'] = $stmt->fetchColumn();
+    } else {
+        $stats['total_leads']     = $db->query("SELECT COUNT(*) FROM leads")->fetchColumn();
+        $stats['new_leads']       = $db->query("SELECT COUNT(*) FROM leads WHERE status='new'")->fetchColumn();
+        $stats['converted_leads'] = $db->query("SELECT COUNT(*) FROM leads WHERE status='converted'")->fetchColumn();
+        $stats['follow_up_leads'] = $db->query("SELECT COUNT(*) FROM leads WHERE status='follow_up'")->fetchColumn();
+    }
 }
 
 if (hasAccess('clients')) {
-    $stats['total_clients']  = $db->query("SELECT COUNT(*) FROM clients WHERE status='active'")->fetchColumn();
+    if ($isInvestor && $investorProjectId) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM clients WHERE status='active' AND project_id=?");
+        $stmt->execute([$investorProjectId]);
+        $stats['total_clients'] = $stmt->fetchColumn();
+    } else {
+        $stats['total_clients']  = $db->query("SELECT COUNT(*) FROM clients WHERE status='active'")->fetchColumn();
+    }
 }
 
 if (hasAccess('invoices')) {
@@ -34,8 +49,14 @@ if (hasAccess('renewals')) {
 // Recent leads (for telecall + admin)
 $recentLeads = [];
 if (hasAccess('leads')) {
-    $stmt = $db->query("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id ORDER BY l.created_at DESC LIMIT 5");
-    $recentLeads = $stmt->fetchAll();
+    if ($isInvestor && $investorProjectId) {
+        $stmt = $db->prepare("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id WHERE l.project_id=? ORDER BY l.created_at DESC LIMIT 5");
+        $stmt->execute([$investorProjectId]);
+        $recentLeads = $stmt->fetchAll();
+    } else {
+        $stmt = $db->query("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id ORDER BY l.created_at DESC LIMIT 5");
+        $recentLeads = $stmt->fetchAll();
+    }
 }
 
 // Recent payments (for finance + admin)

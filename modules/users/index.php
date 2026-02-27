@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone    = trim($_POST['phone'] ?? '');
         $status   = $_POST['status'];
         $password = trim($_POST['password'] ?? '');
+        $assignedProject = (int)($_POST['investor_project_id'] ?? 0);
 
         if ($id > 0) {
             if ($password) {
@@ -32,8 +33,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             else {
                 $db->prepare("INSERT INTO users (name,email,role,phone,status,password) VALUES (?,?,?,?,?,?)")
                    ->execute([$name,$email,$role,$phone,$status,password_hash($password,PASSWORD_DEFAULT)]);
+                $id = (int)$db->lastInsertId();
                 setFlash('success','User created successfully.');
             }
+        }
+        // Upsert investor project assignment
+        if ($role === 'investor' && $id > 0 && $assignedProject > 0) {
+            $db->prepare("INSERT INTO investor_projects (user_id, project_id) VALUES (?,?) ON DUPLICATE KEY UPDATE project_id=?")
+               ->execute([$id, $assignedProject, $assignedProject]);
+        } elseif ($role !== 'investor' && $id > 0) {
+            $db->prepare("DELETE FROM investor_projects WHERE user_id=?")->execute([$id]);
         }
     } elseif ($action === 'toggle') {
         $id  = (int)$_POST['id'];
@@ -45,8 +54,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $db    = getDB();
-$users = $db->query("SELECT * FROM users ORDER BY role, name")->fetchAll();
+$users = $db->query("SELECT u.*, ip.project_id as investor_project_id, p.name as investor_project_name
+                     FROM users u
+                     LEFT JOIN investor_projects ip ON ip.user_id = u.id
+                     LEFT JOIN projects p ON p.id = ip.project_id
+                     ORDER BY u.role, u.name")->fetchAll();
 $editUser = null;
+$projects = $db->query("SELECT id, name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
 if (isset($_GET['edit'])) {
     $stmt = $db->prepare("SELECT * FROM users WHERE id=?");
     $stmt->execute([(int)$_GET['edit']]);
@@ -71,7 +85,7 @@ include __DIR__ . '/../../includes/header.php';
     <div class="table-responsive">
       <table class="table table-hover mb-0 datatable">
         <thead class="table-light">
-          <tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Project</th><th>Status</th><th>Last Login</th><th>Actions</th></tr>
         </thead>
         <tbody>
           <?php foreach ($users as $i => $u): ?>
@@ -81,6 +95,13 @@ include __DIR__ . '/../../includes/header.php';
             <td><?= htmlspecialchars($u['email']) ?></td>
             <td><?= htmlspecialchars($u['phone'] ?? '-') ?></td>
             <td><?= roleLabel($u['role']) ?></td>
+            <td>
+              <?php if ($u['role'] === 'investor' && $u['investor_project_name']): ?>
+                <span class="badge bg-primary"><?= htmlspecialchars($u['investor_project_name']) ?></span>
+              <?php else: ?>
+                <span class="text-muted small">-</span>
+              <?php endif; ?>
+            </td>
             <td><?= statusBadge($u['status']) ?></td>
             <td class="text-muted small"><?= $u['last_login'] ? date('d M Y H:i', strtotime($u['last_login'])) : 'Never' ?></td>
             <td>
@@ -136,12 +157,23 @@ include __DIR__ . '/../../includes/header.php';
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Role *</label>
-              <select name="role" id="uRole" class="form-select" required>
+              <select name="role" id="uRole" class="form-select" required onchange="toggleInvestorProject(this.value)">
                 <option value="telecall">Telecall</option>
                 <option value="finance">Finance</option>
                 <option value="admin">Admin</option>
+                <option value="investor">Investor</option>
+                <option value="csm">Client Success Manager</option>
               </select>
             </div>
+          </div>
+          <div class="mb-3" id="investorProjectField" style="display:none">
+            <label class="form-label">Assigned Project <span class="text-danger">*</span></label>
+            <select name="investor_project_id" id="uInvestorProject" class="form-select">
+              <option value="">Select Project</option>
+              <?php foreach ($projects as $pr): ?>
+              <option value="<?= $pr['id'] ?>"><?= htmlspecialchars($pr['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="mb-3">
             <label class="form-label">Password <span id="pwdNote" class="text-muted small">(leave blank to keep current)</span></label>
@@ -174,7 +206,23 @@ function editUser(u) {
   document.getElementById('uStatus').value   = u.status;
   document.getElementById('modalTitle').textContent = 'Edit User';
   document.getElementById('pwdNote').textContent = '(leave blank to keep current)';
+  toggleInvestorProject(u.role);
+  if (u.role === 'investor' && u.investor_project_id) {
+    document.getElementById('uInvestorProject').value = u.investor_project_id;
+  }
   new bootstrap.Modal(document.getElementById('userModal')).show();
+}
+
+function toggleInvestorProject(role) {
+  const field = document.getElementById('investorProjectField');
+  const sel   = document.getElementById('uInvestorProject');
+  if (role === 'investor') {
+    field.style.display = '';
+    sel.required = true;
+  } else {
+    field.style.display = 'none';
+    sel.required = false;
+  }
 }
 </script>
 

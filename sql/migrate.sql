@@ -15,12 +15,15 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'finance', 'telecall') DEFAULT 'telecall',
+    role ENUM('admin', 'finance', 'telecall', 'investor', 'csm') DEFAULT 'telecall',
     phone VARCHAR(20),
     status ENUM('active', 'inactive') DEFAULT 'active',
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add csm role to existing databases (safe to run multiple times)
+ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'finance', 'telecall', 'investor', 'csm') DEFAULT 'telecall';
 
 -- ============================================================
 -- 2. REGIONS
@@ -74,6 +77,8 @@ CREATE TABLE IF NOT EXISTS leads (
     phone VARCHAR(20) NOT NULL,
     company VARCHAR(200),
     designation VARCHAR(100),
+    website VARCHAR(255),
+    address TEXT,
     source ENUM('website','referral','social_media','cold_call','email','exhibition','other') DEFAULT 'other',
     status ENUM('new','contacted','interested','not_interested','follow_up','converted') DEFAULT 'new',
     assigned_to INT,
@@ -247,18 +252,123 @@ CREATE TABLE IF NOT EXISTS app_settings (
 
 
 -- ============================================================
+-- 15. INVESTOR PROJECT ASSIGNMENTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS investor_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL UNIQUE,
+    project_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- SEED DATA (Default admin + sample data)
 -- ============================================================
 
 INSERT IGNORE INTO users (name, email, password, role) VALUES
-('Super Admin', 'admin@triassoftware.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin')
+('Super Admin', 'admin@triassoftware.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
 
--- Default App Settings
-INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
-('company_name', 'Partner Portal'),
-('company_email', ''),
-('company_phone', ''),
-('company_address', ''),
-('company_gst', ''),
-('invoice_prefix', 'INV-'),
-('invoice_next_number', '1');
+-- ============================================================
+-- 16. PROPOSALS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS proposals (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    proposal_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    valid_until DATE,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    discount DECIMAL(10,2) DEFAULT 0.00,
+    total_amount DECIMAL(10,2) DEFAULT 0.00,
+    status ENUM('draft','sent','accepted','rejected','expired') DEFAULT 'draft',
+    notes TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS proposal_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    proposal_id INT NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    quantity DECIMAL(10,2) DEFAULT 1.00,
+    unit_price DECIMAL(10,2) DEFAULT 0.00,
+    amount DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 17. QUOTATIONS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS quotations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    quotation_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    valid_until DATE,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    tax_percent DECIMAL(5,2) DEFAULT 18.00,
+    tax_amount DECIMAL(10,2) DEFAULT 0.00,
+    total_amount DECIMAL(10,2) DEFAULT 0.00,
+    status ENUM('draft','sent','accepted','rejected','expired') DEFAULT 'draft',
+    notes TEXT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS quotation_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    quotation_id INT NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    quantity DECIMAL(10,2) DEFAULT 1.00,
+    unit_price DECIMAL(10,2) DEFAULT 0.00,
+    amount DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 18. DEMO SCHEDULING
+-- ============================================================
+CREATE TABLE IF NOT EXISTS demos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    demo_no VARCHAR(30) UNIQUE,
+    lead_id INT,
+    client_id INT,
+    project_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    demo_type ENUM('online','onsite','phone') DEFAULT 'online',
+    scheduled_at DATETIME NOT NULL,
+    duration_mins INT DEFAULT 60,
+    meeting_link VARCHAR(500),
+    location TEXT,
+    status ENUM('scheduled','completed','cancelled','rescheduled') DEFAULT 'scheduled',
+    notes TEXT,
+    assigned_to INT,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add missing columns to leads table for live databases
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS website VARCHAR(255) AFTER designation;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS address TEXT AFTER website;
