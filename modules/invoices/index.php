@@ -29,7 +29,12 @@ $byStatus = [];
 foreach ($summary as $s) $byStatus[$s['status']] = $s;
 
 // KPI values
-$totalPending = array_sum(array_map(fn($r) => $r['total'] - $r['paid'], array_filter($byStatus, fn($s) => in_array($s, ['pending','partial','overdue']), ARRAY_FILTER_USE_KEY)));
+$totalPending = 0;
+foreach (['pending', 'partial', 'overdue'] as $st) {
+    if (isset($byStatus[$st])) {
+        $totalPending += ($byStatus[$st]['total'] - $byStatus[$st]['paid']);
+    }
+}
 $totalCollected = array_sum(array_column($summary, 'paid'));
 $overdueCount = $byStatus['overdue']['cnt'] ?? 0;
 $totalInvoices = array_sum(array_column($summary, 'cnt'));

@@ -25,7 +25,10 @@ if (!$rawHeaders) {
     setFlash('error', 'CSV file is empty or unreadable.');
     redirect(BASE_URL . '/modules/leads/index.php');
 }
-$headers = array_map(fn($h) => strtolower(trim(str_replace([' ','-'], '_', $h))), $rawHeaders);
+$headers = array_map(function($h) {
+    $h = preg_replace('/^\xEF\xBB\xBF/', '', $h);
+    return strtolower(trim(str_replace([' ','-'], '_', $h)));
+}, $rawHeaders);
 
 // Validate mandatory columns
 $required = ['name', 'phone', 'project_code'];
@@ -36,7 +39,11 @@ if ($missing) {
 }
 
 // Load lookup maps
-$projects = $db->query("SELECT id, code FROM projects")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+$projectsRaw = $db->query("SELECT id, code FROM projects")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+$projects = [];
+foreach ($projectsRaw as $pId => $pCode) {
+    if ($pCode) $projects[strtolower(trim((string)$pCode))] = $pId;
+}
 // Also try by name
 $projectsByName = $db->query("SELECT id, name FROM projects")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 $regions = $db->query("SELECT id, LOWER(name) as name FROM regions WHERE status='active'")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
@@ -44,7 +51,8 @@ $regions = $db->query("SELECT id, LOWER(name) as name FROM regions WHERE status=
 $regionMap = array_flip($regions);
 
 function findProject(array $projects, array $byName, string $code): ?int {
-    if (isset($projects[$code])) return (int)$projects[$code];
+    $codeLower = strtolower(trim($code));
+    if (isset($projects[$codeLower])) return (int)$projects[$codeLower];
     // Try case-insensitive name match
     foreach ($byName as $id => $name) {
         if (strcasecmp($name, $code) === 0) return (int)$id;

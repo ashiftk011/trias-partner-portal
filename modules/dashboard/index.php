@@ -37,6 +37,24 @@ if (hasAccess('clients')) {
 }
 
 if (hasAccess('invoices')) {
+    // Fetch invoice data grouped by status
+    $invoiceQuery = "SELECT status, SUM(total_amount) as total, SUM(paid_amount) as paid FROM invoices GROUP BY status";
+    $invoiceResults = $db->query($invoiceQuery)->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_ASSOC);
+
+    $byStatus = [];
+    foreach ($invoiceResults as $status => $data) {
+        $byStatus[$status] = $data[0]; // Assuming status is unique for each group
+    }
+
+    $invPending = 0;
+    foreach (['pending', 'partial', 'overdue'] as $st) {
+        if (isset($byStatus[$st])) {
+            $invPending += ($byStatus[$st]['total'] - $byStatus[$st]['paid']);
+        }
+    }
+    $stats['pending_invoices_amount'] = $invPending; // Renamed to reflect it's an amount
+
+    // Keep existing counts for pending/overdue if needed, or remove if replaced by amount
     $stats['pending_invoices'] = $db->query("SELECT COUNT(*) FROM invoices WHERE status='pending'")->fetchColumn();
     $stats['overdue_invoices'] = $db->query("SELECT COUNT(*) FROM invoices WHERE status='overdue'")->fetchColumn();
     $stats['revenue_month']    = $db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE MONTH(payment_date)=MONTH(NOW()) AND YEAR(payment_date)=YEAR(NOW())")->fetchColumn();

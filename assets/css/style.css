@@ -335,7 +335,7 @@ body {
 }
 
 .content-area {
-  max-width: 1600px;
+  width: 100%;
 }
 
 /* Nav link active (legacy compat) */
@@ -473,10 +473,15 @@ div.dataTables_wrapper div.dataTables_length select {
 
   .sidebar.mobile-open {
     width: var(--sidebar-width);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
   }
 
   .top-navbar {
     left: 0;
+  }
+
+  .top-navbar-inner {
+    padding: 0 12px;
   }
 
   .main-content {
@@ -488,7 +493,62 @@ div.dataTables_wrapper div.dataTables_length select {
   }
 
   .content-area {
+    padding: 0.75rem !important;
+  }
+
+  /* Global Mobile Spacing Reductions */
+  .card-body {
     padding: 1rem !important;
+  }
+
+  .row {
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 1rem;
+  }
+
+  /* Override hardcoded Bootstrap spacing utilities on mobile */
+  .mb-4 {
+    margin-bottom: 1rem !important;
+  }
+
+  .mb-5 {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .p-4 {
+    padding: 1rem !important;
+  }
+
+  .p-5 {
+    padding: 1.5rem !important;
+  }
+
+  .g-4,
+  .gap-4 {
+    gap: 1rem !important;
+  }
+
+  /* Adjust Page Headers */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+    margin-bottom: 1rem !important;
+  }
+
+  .page-header h4 {
+    font-size: 1.25rem;
+  }
+
+  /* DataTables spacing */
+  div.dataTables_wrapper div.dataTables_filter,
+  div.dataTables_wrapper div.dataTables_length {
+    padding: 10px 12px;
+  }
+
+  div.dataTables_wrapper div.dataTables_filter {
+    text-align: left;
+    margin-top: 8px;
   }
 }
 
