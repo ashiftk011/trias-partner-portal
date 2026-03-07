@@ -196,9 +196,14 @@ CREATE TABLE IF NOT EXISTS invoices (
     invoice_date DATE NOT NULL,
     due_date DATE NOT NULL,
     subtotal DECIMAL(10,2) DEFAULT 0.00,
+    discount_type ENUM('percent','fixed') DEFAULT 'percent',
+    discount_percent DECIMAL(5,2) DEFAULT 0.00,
+    discount_amount DECIMAL(10,2) DEFAULT 0.00,
     tax_percent DECIMAL(5,2) DEFAULT 18.00,
     tax_amount DECIMAL(10,2) DEFAULT 0.00,
     total_amount DECIMAL(10,2) DEFAULT 0.00,
+    advance_amount DECIMAL(10,2) DEFAULT 0.00,
+    advance_date DATE NULL,
     paid_amount DECIMAL(10,2) DEFAULT 0.00,
     status ENUM('pending','paid','partial','overdue','cancelled') DEFAULT 'pending',
     notes TEXT,
@@ -215,7 +220,8 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE TABLE IF NOT EXISTS invoice_items (
     id INT PRIMARY KEY AUTO_INCREMENT,
     invoice_id INT NOT NULL,
-    description VARCHAR(255) NOT NULL,
+    item_name VARCHAR(255) NOT NULL DEFAULT '',
+    description TEXT,
     quantity DECIMAL(10,2) DEFAULT 1.00,
     unit_price DECIMAL(10,2) DEFAULT 0.00,
     amount DECIMAL(10,2) DEFAULT 0.00,
@@ -372,3 +378,14 @@ CREATE TABLE IF NOT EXISTS demos (
 -- Add missing columns to leads table for live databases
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS website VARCHAR(255) AFTER designation;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS address TEXT AFTER website;
+
+-- Add missing columns to invoices table for live databases
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_percent DECIMAL(5,2) DEFAULT 0.00 AFTER subtotal;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0.00 AFTER discount_percent;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_type ENUM('percent','fixed') DEFAULT 'percent' AFTER subtotal;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_amount DECIMAL(10,2) DEFAULT 0.00 AFTER total_amount;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_date DATE NULL AFTER advance_amount;
+
+-- Add item_name column to invoice_items for live databases
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(255) NOT NULL DEFAULT '' AFTER invoice_id;
+ALTER TABLE invoice_items MODIFY COLUMN description TEXT;

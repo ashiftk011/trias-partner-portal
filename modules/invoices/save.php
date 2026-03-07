@@ -22,28 +22,32 @@ if ($preRenewalId) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
-    $clientId       = (int)$_POST['client_id'];
-    $renewalId      = $_POST['renewal_id'] ? (int)$_POST['renewal_id'] : null;
-    $invDate        = $_POST['invoice_date'];
-    $dueDate        = $_POST['due_date'];
-    $taxPercent     = (float)$_POST['tax_percent'];
-    $discountPercent= (float)($_POST['discount_percent'] ?? 0);
-    $notes          = trim($_POST['notes'] ?? '');
-    $userId         = currentUser()['id'];
+    $clientId        = (int)$_POST['client_id'];
+    $renewalId       = $_POST['renewal_id'] ? (int)$_POST['renewal_id'] : null;
+    $invDate         = $_POST['invoice_date'];
+    $dueDate         = $_POST['due_date'];
+    $taxPercent      = (float)$_POST['tax_percent'];
+    $discountType    = ($_POST['discount_type'] ?? 'percent') === 'fixed' ? 'fixed' : 'percent';
+    $notes           = trim($_POST['notes'] ?? '');
+    $advanceAmount   = max(0, (float)($_POST['advance_amount'] ?? 0));
+    $advanceDate     = !empty($_POST['advance_date']) ? $_POST['advance_date'] : null;
+    $userId          = currentUser()['id'];
 
     // Parse line items
-    $descriptions = $_POST['item_desc'] ?? [];
+    $itemNames    = $_POST['item_name'] ?? [];
+    $itemDescs    = $_POST['item_desc'] ?? [];
     $quantities   = $_POST['item_qty'] ?? [];
     $unitPrices   = $_POST['item_price'] ?? [];
     $items = [];
     $subtotal = 0;
-    for ($i = 0; $i < count($descriptions); $i++) {
-        $desc = trim($descriptions[$i] ?? '');
-        if ($desc === '') continue;
+    for ($i = 0; $i < count($itemNames); $i++) {
+        $name = trim($itemNames[$i] ?? '');
+        if ($name === '') continue;
+        $desc  = trim($itemDescs[$i] ?? '');
         $qty   = max(0, (float)($quantities[$i] ?? 1));
         $price = max(0, (float)($unitPrices[$i] ?? 0));
         $amt   = round($qty * $price, 2);
-        $items[] = ['desc' => $desc, 'qty' => $qty, 'price' => $price, 'amount' => $amt];
+        $items[] = ['name' => $name, 'desc' => $desc, 'qty' => $qty, 'price' => $price, 'amount' => $amt];
         $subtotal += $amt;
     }
 
@@ -52,7 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(BASE_URL . '/modules/invoices/save.php?client_id=' . $clientId);
     }
 
-    $discountAmount = round($subtotal * $discountPercent / 100, 2);
+    // Discount calculation
+    if ($discountType === 'fixed') {
+        $discountAmount  = round(min((float)($_POST['discount_value'] ?? 0), $subtotal), 2);
+        $discountPercent = $subtotal > 0 ? round($discountAmount / $subtotal * 100, 4) : 0;
+    } else {
+        $discountPercent = max(0, min(100, (float)($_POST['discount_value'] ?? 0)));
+        $discountAmount  = round($subtotal * $discountPercent / 100, 2);
+    }
+
     $afterDiscount  = $subtotal - $discountAmount;
     $taxAmount      = round($afterDiscount * $taxPercent / 100, 2);
     $totalAmount    = round($afterDiscount + $taxAmount, 2);
@@ -62,20 +74,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastNum = $lastInv ? (int)preg_replace('/\D/','',$lastInv) : 0;
     $invoiceNo = 'INV-' . str_pad($lastNum+1, 5, '0', STR_PAD_LEFT);
 
-    $db->prepare("INSERT INTO invoices (invoice_no,client_id,renewal_id,invoice_date,due_date,subtotal,discount_percent,discount_amount,tax_percent,tax_amount,total_amount,paid_amount,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'pending',?,?)")
-       ->execute([$invoiceNo,$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$notes,$userId]);
+    $db->prepare("INSERT INTO invoices (invoice_no,client_id,renewal_id,invoice_date,due_date,subtotal,discount_type,discount_percent,discount_amount,tax_percent,tax_amount,total_amount,advance_amount,advance_date,paid_amount,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending',?,?)")
+       ->execute([$invoiceNo,$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$notes,$userId]);
 
     $newId = $db->lastInsertId();
 
     // Save line items
-    $itemStmt = $db->prepare("INSERT INTO invoice_items (invoice_id,description,quantity,unit_price,amount) VALUES (?,?,?,?,?)");
+    $itemStmt = $db->prepare("INSERT INTO invoice_items (invoice_id,item_name,description,quantity,unit_price,amount) VALUES (?,?,?,?,?,?)");
     foreach ($items as $item) {
-        $itemStmt->execute([$newId, $item['desc'], $item['qty'], $item['price'], $item['amount']]);
+        $itemStmt->execute([$newId, $item['name'], $item['desc'], $item['qty'], $item['price'], $item['amount']]);
     }
 
     setFlash('success',"Invoice {$invoiceNo} created successfully.");
     redirect(BASE_URL . '/modules/invoices/view.php?id=' . $newId);
 }
+
 
 $clients  = $db->query("SELECT id,name,client_code,company FROM clients WHERE status='active' ORDER BY name")->fetchAll();
 $renewals = [];
@@ -148,18 +161,20 @@ include __DIR__ . '/../../includes/header.php';
               <table class="table table-bordered align-middle mb-0" id="itemsTable">
                 <thead class="table-light">
                   <tr>
-                    <th style="width:5%">#</th>
-                    <th style="width:45%">Description</th>
-                    <th style="width:15%">Qty</th>
-                    <th style="width:15%">Unit Price (₹)</th>
-                    <th style="width:15%">Amount (₹)</th>
-                    <th style="width:5%"></th>
+                    <th style="width:4%" class="text-center">S.No</th>
+                    <th style="width:22%">Item</th>
+                    <th style="width:28%">Description</th>
+                    <th style="width:12%">Qty</th>
+                    <th style="width:17%">Unit Price (₹)</th>
+                    <th style="width:13%">Amount (₹)</th>
+                    <th style="width:4%"></th>
                   </tr>
                 </thead>
                 <tbody id="itemsBody">
                   <tr class="item-row">
                     <td class="row-num text-center text-muted">1</td>
-                    <td><input type="text" name="item_desc[]" class="form-control form-control-sm" placeholder="Service description..." required value="<?= $preClient ? htmlspecialchars($preClient['plan_name'] ?? 'Service Charges') : '' ?>"></td>
+                    <td><input type="text" name="item_name[]" class="form-control form-control-sm" placeholder="Item name" required value="<?= $preClient ? htmlspecialchars($preClient['plan_name'] ?? 'Service Charges') : '' ?>"></td>
+                    <td><input type="text" name="item_desc[]" class="form-control form-control-sm" placeholder="Details (optional)"></td>
                     <td><input type="number" name="item_qty[]" class="form-control form-control-sm item-qty" min="0" step="0.01" value="1"></td>
                     <td><input type="number" name="item_price[]" class="form-control form-control-sm item-price" min="0" step="0.01" value="<?= $preClient ? $preClient['plan_price'] : '' ?>"></td>
                     <td><input type="text" class="form-control form-control-sm item-amount bg-light fw-semibold" readonly></td>
@@ -185,9 +200,11 @@ include __DIR__ . '/../../includes/header.php';
                 <div class="d-flex justify-content-between align-items-center mb-2">
                   <div class="d-flex align-items-center gap-2">
                     <span class="text-muted">Discount:</span>
-                    <div class="input-group input-group-sm" style="width:100px">
-                      <input type="number" name="discount_percent" id="invDiscount" class="form-control" value="0" min="0" max="100" step="0.01">
-                      <span class="input-group-text">%</span>
+                    <div class="input-group input-group-sm" style="width:160px">
+                      <button type="button" class="btn btn-outline-secondary btn-sm px-2" id="discTypeToggle" title="Switch between % and ₹">%</button>
+                      <input type="hidden" name="discount_type" id="discTypeHidden" value="percent">
+                      <input type="number" name="discount_value" id="invDiscount" class="form-control" value="0" min="0" step="0.01">
+                      <span class="input-group-text" id="discSymbol">%</span>
                     </div>
                   </div>
                   <span class="text-danger" id="dispDiscount">-₹0.00</span>
@@ -207,9 +224,27 @@ include __DIR__ . '/../../includes/header.php';
                   <span id="dispTax">₹0.00</span>
                 </div>
                 <hr class="my-2">
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between mb-2">
                   <span class="fw-bold fs-5">Total:</span>
                   <span class="fw-bold fs-5 text-primary" id="dispTotal">₹0.00</span>
+                </div>
+                <!-- Advance Amount -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted">Advance Paid:</span>
+                    <input type="number" name="advance_amount" id="invAdvance" class="form-control form-control-sm" style="width:110px" value="0" min="0" step="0.01">
+                  </div>
+                  <span class="text-success" id="dispAdvance">₹0.00</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted">Advance Date:</span>
+                    <input type="date" name="advance_date" id="invAdvanceDate" class="form-control form-control-sm" style="width:145px">
+                  </div>
+                </div>
+                <div class="d-flex justify-content-between border-top pt-2 mt-1">
+                  <span class="fw-semibold text-danger">Balance Due:</span>
+                  <span class="fw-bold text-danger" id="dispBalance">₹0.00</span>
                 </div>
               </div>
             </div>
@@ -251,27 +286,38 @@ function calcTotals() {
     subtotal += qty * price;
   });
 
-  const discPct = parseFloat(document.getElementById('invDiscount').value) || 0;
-  const discAmt = subtotal * discPct / 100;
+  const discType = document.getElementById('discTypeHidden').value;
+  const discVal  = parseFloat(document.getElementById('invDiscount').value) || 0;
+  let discAmt;
+  if (discType === 'fixed') {
+    discAmt = Math.min(discVal, subtotal);
+  } else {
+    discAmt = subtotal * discVal / 100;
+  }
   const afterDisc = subtotal - discAmt;
   const taxPct = parseFloat(document.getElementById('invTax').value) || 0;
   const taxAmt = afterDisc * taxPct / 100;
   const total = afterDisc + taxAmt;
+  const advance = parseFloat(document.getElementById('invAdvance').value) || 0;
+  const balance = Math.max(0, total - advance);
 
   document.getElementById('dispSubtotal').textContent = '₹' + subtotal.toFixed(2);
   document.getElementById('dispDiscount').textContent = '-₹' + discAmt.toFixed(2);
   document.getElementById('dispAfterDiscount').textContent = '₹' + afterDisc.toFixed(2);
   document.getElementById('dispTax').textContent = '₹' + taxAmt.toFixed(2);
   document.getElementById('dispTotal').textContent = '₹' + total.toFixed(2);
+  document.getElementById('dispAdvance').textContent = '₹' + advance.toFixed(2);
+  document.getElementById('dispBalance').textContent = '₹' + balance.toFixed(2);
 }
 
-function addRow(desc = '', qty = 1, price = '') {
+function addRow(name = '', desc = '', qty = 1, price = '') {
   rowCounter++;
   const tr = document.createElement('tr');
   tr.className = 'item-row';
   tr.innerHTML = `
     <td class="row-num text-center text-muted">${rowCounter}</td>
-    <td><input type="text" name="item_desc[]" class="form-control form-control-sm" placeholder="Service description..." required value="${desc}"></td>
+    <td><input type="text" name="item_name[]" class="form-control form-control-sm" placeholder="Item name" required value="${name}"></td>
+    <td><input type="text" name="item_desc[]" class="form-control form-control-sm" placeholder="Details (optional)" value="${desc}"></td>
     <td><input type="number" name="item_qty[]" class="form-control form-control-sm item-qty" min="0" step="0.01" value="${qty}"></td>
     <td><input type="number" name="item_price[]" class="form-control form-control-sm item-price" min="0" step="0.01" value="${price}"></td>
     <td><input type="text" class="form-control form-control-sm item-amount bg-light fw-semibold" readonly></td>
@@ -304,6 +350,25 @@ document.querySelectorAll('#itemsBody .item-row').forEach(row => {
 document.getElementById('addItemBtn').addEventListener('click', () => addRow());
 document.getElementById('invDiscount').addEventListener('input', calcTotals);
 document.getElementById('invTax').addEventListener('input', calcTotals);
+document.getElementById('invAdvance').addEventListener('input', calcTotals);
+
+// ---- Discount Type Toggle ----
+document.getElementById('discTypeToggle').addEventListener('click', function() {
+  const hidden = document.getElementById('discTypeHidden');
+  const symbol = document.getElementById('discSymbol');
+  if (hidden.value === 'percent') {
+    hidden.value = 'fixed';
+    this.textContent = '₹';
+    symbol.textContent = '₹';
+    document.getElementById('invDiscount').removeAttribute('max');
+  } else {
+    hidden.value = 'percent';
+    this.textContent = '%';
+    symbol.textContent = '%';
+    document.getElementById('invDiscount').setAttribute('max', '100');
+  }
+  calcTotals();
+});
 
 // ---- Renewal auto-fill ----
 $('#invRenewal').on('change', function() {

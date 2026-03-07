@@ -9,7 +9,7 @@ $db = getDB();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
-    $fields = ['company_name','company_address','company_email','company_phone'];
+    $fields = ['company_name','company_address','company_email','company_phone','company_website'];
     foreach ($fields as $key) {
         $value = trim($_POST[$key] ?? '');
         $db->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?")
@@ -111,6 +111,15 @@ include __DIR__ . '/../../includes/header.php';
                        placeholder="+91 9876543210">
               </div>
             </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Website</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-globe2"></i></span>
+                <input type="url" name="company_website" class="form-control"
+                       value="<?= htmlspecialchars($settings['company_website'] ?? '') ?>"
+                       placeholder="https://www.yourcompany.com">
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -171,6 +180,9 @@ include __DIR__ . '/../../includes/header.php';
               <?php endif; ?>
               <?php if (!empty($settings['company_phone'])): ?>
               <div class="small text-muted"><?= htmlspecialchars($settings['company_phone']) ?></div>
+              <?php endif; ?>
+              <?php if (!empty($settings['company_website'])): ?>
+              <div class="small text-muted"><i class="bi bi-globe2 me-1"></i><?= htmlspecialchars($settings['company_website']) ?></div>
               <?php endif; ?>
             </div>
           </div>

@@ -88,6 +88,7 @@ include __DIR__ . '/../../includes/header.php';
   <div class="col-xl-8">
     <div class="card border-0 shadow-sm" id="invoicePrint">
       <div class="card-body p-0 position-relative inv-body">
+        <div class="inv-content">
 
         <?php if (!empty($companySettings['company_logo'])): ?>
         <div class="inv-watermark">
@@ -105,7 +106,7 @@ include __DIR__ . '/../../includes/header.php';
             <img src="<?= BASE_URL . '/' . htmlspecialchars($companySettings['company_logo']) ?>"
                  alt="Logo" class="inv-logo">
             <?php endif; ?>
-            <div class="inv-company-name"><?= htmlspecialchars($companySettings['company_name'] ?? APP_NAME) ?></div>
+            <!--<div class="inv-company-name"><?= htmlspecialchars($companySettings['company_name'] ?? APP_NAME) ?></div>-->
             <?php if (!empty($companySettings['company_address'])): ?>
             <div class="inv-company-detail"><?= nl2br(htmlspecialchars($companySettings['company_address'])) ?></div>
             <?php endif; ?>
@@ -123,6 +124,17 @@ include __DIR__ . '/../../includes/header.php';
           <div class="inv-info-cell">
             <div class="inv-info-label">Billed to:</div>
             <div class="inv-info-value"><?= htmlspecialchars($inv['client_name']) ?></div>
+              <div class="inv-client-sub">
+              <?php if ($inv['company']): ?><div><?= htmlspecialchars($inv['company']) ?></div><?php endif; ?>
+              <?php
+              $addrParts = array_filter([$inv['address'], $inv['city'], $inv['state']]);
+              if ($addrParts): ?>
+              <div><?= htmlspecialchars(implode(', ', $addrParts)) ?></div>
+              <?php endif; ?>
+              <?php if ($inv['gst_no']): ?><div>GST: <?= htmlspecialchars($inv['gst_no']) ?></div><?php endif; ?>
+              <?php if ($inv['client_phone']): ?><div class="mt-1">Mobile: <?= htmlspecialchars($inv['client_phone']) ?></div><?php endif; ?>
+              <?php if ($inv['client_email']): ?><div>Email: <?= htmlspecialchars($inv['client_email']) ?></div><?php endif; ?>
+              </div>
           </div>
           <div class="inv-info-cell">
             <div class="inv-info-label">Date Issued:</div>
@@ -134,21 +146,9 @@ include __DIR__ . '/../../includes/header.php';
           </div>
           <div class="inv-info-cell">
             <div class="inv-info-label">Amount Due:</div>
-            <div class="inv-info-value inv-amount-due">₹<?= number_format($inv['total_amount'] - $inv['paid_amount'], 0) ?></div>
+            <?php $amountDue = max(0, $inv['total_amount'] - (float)($inv['advance_amount'] ?? 0) - $inv['paid_amount']); ?>
+            <div class="inv-info-value inv-amount-due">₹<?= number_format($amountDue, 0) ?></div>
           </div>
-        </div>
-
-        <!-- ===== Client Address ===== -->
-        <div class="inv-client-address">
-          <?php if ($inv['company']): ?><div><?= htmlspecialchars($inv['company']) ?></div><?php endif; ?>
-          <?php
-          $addrParts = array_filter([$inv['address'], $inv['city'], $inv['state']]);
-          if ($addrParts): ?>
-          <div><?= htmlspecialchars(implode(', ', $addrParts)) ?></div>
-          <?php endif; ?>
-          <?php if ($inv['gst_no']): ?><div>GST: <?= htmlspecialchars($inv['gst_no']) ?></div><?php endif; ?>
-          <?php if ($inv['client_phone']): ?><div class="mt-1"><strong>Mobile:</strong> <?= htmlspecialchars($inv['client_phone']) ?></div><?php endif; ?>
-          <?php if ($inv['client_email']): ?><div><strong>Email:</strong> <?= htmlspecialchars($inv['client_email']) ?></div><?php endif; ?>
         </div>
 
         <!-- ===== Items Table ===== -->
@@ -156,62 +156,95 @@ include __DIR__ . '/../../includes/header.php';
           <table class="inv-table">
             <thead>
               <tr>
-                <th style="width:20%">Item</th>
-                <th style="width:40%">Description</th>
-                <th style="width:20%" class="text-end">Cost (INR)</th>
-                <th style="width:20%" class="text-end">Total</th>
+                <th style="width:5%" class="text-center">S.No</th>
+                <th style="width:22%">Item</th>
+                <th style="width:30%">Description</th>
+                <th style="width:8%" class="text-center">Qty</th>
+                <th style="width:17%" class="text-end">Unit Price</th>
+                <th style="width:18%" class="text-end">Total</th>
               </tr>
             </thead>
             <tbody>
               <?php if (!empty($lineItems)): ?>
-                <?php foreach ($lineItems as $item): ?>
+                <?php foreach ($lineItems as $idx => $item): ?>
                 <tr>
-                  <td class="fw-semibold"><?= htmlspecialchars($item['description']) ?></td>
-                  <td><?= $item['quantity'] > 1 ? 'Qty: ' . number_format($item['quantity'],0) : '' ?></td>
-                  <td class="text-end">₹<?= number_format($item['unit_price'],0) ?></td>
-                  <td class="text-end fw-bold">₹<?= number_format($item['amount'],0) ?></td>
+                  <td class="text-center text-muted"><?= $idx + 1 ?></td>
+                  <td class="fw-semibold"><?= htmlspecialchars($item['item_name'] ?: $item['description']) ?></td>
+                  <td class="text-muted" style="font-size:.83rem"><?= htmlspecialchars($item['description'] ?? '') ?></td>
+                  <td class="text-center"><?= $item['quantity'] != 1 ? number_format($item['quantity'], 0) : 1 ?></td>
+                  <td class="text-end">₹<?= number_format($item['unit_price'], 0) ?></td>
+                  <td class="text-end fw-bold">₹<?= number_format($item['amount'], 0) ?></td>
                 </tr>
                 <?php endforeach; ?>
               <?php else: ?>
                 <tr>
+                  <td class="text-center text-muted">1</td>
                   <td class="fw-semibold"><?= htmlspecialchars($inv['plan_name'] ?? 'Service Charges') ?></td>
-                  <td><?= $inv['notes'] ? htmlspecialchars($inv['notes']) : '' ?></td>
-                  <td class="text-end">₹<?= number_format($inv['subtotal'],0) ?></td>
-                  <td class="text-end fw-bold">₹<?= number_format($inv['subtotal'],0) ?></td>
+                  <td class="text-muted" style="font-size:.83rem"><?= $inv['notes'] ? htmlspecialchars($inv['notes']) : '' ?></td>
+                  <td class="text-center">1</td>
+                  <td class="text-end">₹<?= number_format($inv['subtotal'], 0) ?></td>
+                  <td class="text-end fw-bold">₹<?= number_format($inv['subtotal'], 0) ?></td>
                 </tr>
               <?php endif; ?>
             </tbody>
             <tfoot>
-              <?php if ($discountPercent > 0): ?>
+              <?php if ($discountPercent > 0 || $discountAmount > 0): ?>
               <tr>
-                <td colspan="3" class="text-end">Discount (<?= $discountPercent ?>%):</td>
+                <td colspan="5" class="text-end">
+                  Discount
+                  <?php if (($inv['discount_type'] ?? 'percent') === 'fixed'): ?>
+                    (Fixed):
+                  <?php else: ?>
+                    (<?= $discountPercent ?>%):
+                  <?php endif; ?>
+                </td>
                 <td class="text-end text-danger">-₹<?= number_format($discountAmount,0) ?></td>
               </tr>
               <?php endif; ?>
               <?php if ($inv['tax_percent'] > 0): ?>
               <tr>
-                <td colspan="3" class="text-end">GST / Tax (<?= $inv['tax_percent'] ?>%):</td>
+                <td colspan="5" class="text-end">GST / Tax (<?= $inv['tax_percent'] ?>%):</td>
                 <td class="text-end">₹<?= number_format($inv['tax_amount'],0) ?></td>
               </tr>
               <?php endif; ?>
               <tr class="inv-total-row">
-                <td colspan="3" class="text-end"><strong>Total</strong></td>
+                <td colspan="5" class="text-end"><strong>Total</strong></td>
                 <td class="text-end"><strong>₹<?= number_format($inv['total_amount'],0) ?></strong></td>
               </tr>
               <tr>
                 <td colspan="1"></td>
-                <td colspan="3" class="inv-words-cell">
+                <td colspan="5" class="inv-words-cell">
                   <strong><?= $amountInWords ?></strong>
                 </td>
               </tr>
+              <?php $advanceAmt = (float)($inv['advance_amount'] ?? 0); ?>
+              <?php if ($advanceAmt > 0): ?>
+              <tr>
+                <td colspan="5" class="text-end text-primary">
+                  Advance Received
+                  <?php if (!empty($inv['advance_date'])): ?>
+                    <span class="text-muted" style="font-size:.8em">(<?= date('d-M-Y', strtotime($inv['advance_date'])) ?>)</span>
+                  <?php endif; ?>
+                  :
+                </td>
+                <td class="text-end text-primary fw-bold">₹<?= number_format($advanceAmt,0) ?></td>
+              </tr>
+              <?php endif; ?>
               <?php if ($inv['paid_amount'] > 0): ?>
               <tr>
-                <td colspan="3" class="text-end text-success">Amount Paid:</td>
+                <td colspan="5" class="text-end text-success">Amount Paid:</td>
                 <td class="text-end text-success fw-bold">₹<?= number_format($inv['paid_amount'],0) ?></td>
               </tr>
-              <?php $balance = $inv['total_amount'] - $inv['paid_amount']; if ($balance > 0): ?>
+              <?php $balance = $inv['total_amount'] - $advanceAmt - $inv['paid_amount']; if ($balance > 0): ?>
               <tr>
-                <td colspan="3" class="text-end text-danger">Balance Due:</td>
+                <td colspan="5" class="text-end text-danger">Balance Due:</td>
+                <td class="text-end text-danger fw-bold">₹<?= number_format($balance,0) ?></td>
+              </tr>
+              <?php endif; ?>
+              <?php else: ?>
+              <?php $balance = $inv['total_amount'] - $advanceAmt; if ($balance > 0 && $advanceAmt > 0): ?>
+              <tr>
+                <td colspan="5" class="text-end text-danger">Balance Due:</td>
                 <td class="text-end text-danger fw-bold">₹<?= number_format($balance,0) ?></td>
               </tr>
               <?php endif; ?>
@@ -230,6 +263,26 @@ include __DIR__ . '/../../includes/header.php';
         <div class="inv-thankyou">
           Thank you for doing business with us
         </div>
+
+        </div><!-- /.inv-content -->
+
+        <?php
+          $hasWebsite = !empty($companySettings['company_website']);
+          $hasEmail   = !empty($companySettings['company_email']);
+        ?>
+        <?php if ($hasWebsite || $hasEmail): ?>
+        <div class="inv-footer">
+          <?php if ($hasEmail): ?>
+          <span><?= htmlspecialchars($companySettings['company_email']) ?></span>
+          <?php endif; ?>
+          <?php if ($hasWebsite && $hasEmail): ?>
+          <span class="inv-footer-sep">|</span>
+          <?php endif; ?>
+          <?php if ($hasWebsite): ?>
+          <span><?= htmlspecialchars($companySettings['company_website']) ?></span>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
 
       </div>
     </div>
@@ -275,11 +328,20 @@ include __DIR__ . '/../../includes/header.php';
    INVOICE VIEW — Matching Reference Design
    ============================================================ */
 .inv-body {
-  padding: 40px;
   font-family: 'Inter', 'Segoe UI', sans-serif;
   color: #1e293b;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 900px;
+}
+
+.inv-content {
+  padding: 40px;
+  flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 /* Watermark */
@@ -296,7 +358,7 @@ include __DIR__ . '/../../includes/header.php';
   max-width: 450px;
   max-height: 450px;
 }
-.inv-body > *:not(.inv-watermark) {
+.inv-body > *:not(.inv-watermark):not(.inv-footer) {
   position: relative;
   z-index: 1;
 }
@@ -377,13 +439,34 @@ include __DIR__ . '/../../includes/header.php';
   color: #0ea5e9;
 }
 
-/* Client Address */
-.inv-client-address {
-  font-size: .88rem;
-  color: #334155;
-  line-height: 1.6;
-  margin-bottom: 20px;
-  padding-left: 4px;
+/* Client address sub-text (company, address, phone, email under client name) */
+.inv-client-sub {
+  font-size: .75rem;
+  color: #64748b;
+  line-height: 1.5;
+  margin-top: 3px;
+}
+
+/* Invoice Footer — dark navy bar at bottom */
+.inv-footer {
+  background: #1e2d5a;
+  color: #e2e8f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 40px;
+  font-size: .82rem;
+  letter-spacing: .01em;
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+.inv-footer-sep {
+  opacity: 0.5;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 /* Items Table */
@@ -452,6 +535,7 @@ include __DIR__ . '/../../includes/header.php';
   color: #0ea5e9;
   margin-top: 30px;
   padding-top: 16px;
+  padding-bottom: 30px;
 }
 
 /* ===== Print ===== */
@@ -461,7 +545,8 @@ include __DIR__ . '/../../includes/header.php';
   .main-content { margin-left: 0 !important; }
   body { background: white !important; }
   .card { box-shadow: none !important; border: none !important; }
-  .inv-body { padding: 20px 30px; }
+  .inv-content { padding: 10px 20px; }
+  .inv-body { min-height: 100vh; }
   .inv-watermark { opacity: 0.05 !important; }
   .inv-watermark img { max-width: 500px; max-height: 500px; }
 }
