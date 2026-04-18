@@ -4,11 +4,22 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('leads');
 
 $db = getDB();
+$user       = currentUser();
 $isInvestor = isRole('investor');
-$investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
+$isTelecall = isRole('telecall');
+$investorProjectId    = $isInvestor ? getInvestorProjectId() : 0;
+$telecallProjectIds   = $isTelecall ? getTelecallProjectIds() : [];
 
 // Filters
-$filterProject = $isInvestor ? $investorProjectId : (isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0);
+if ($isInvestor) {
+    $filterProject = $investorProjectId;
+} elseif ($isTelecall) {
+    // Telecall may only filter within their assigned projects
+    $req = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+    $filterProject = ($req && in_array($req, $telecallProjectIds)) ? $req : 0;
+} else {
+    $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
+}
 $filterStatus  = $_GET['status'] ?? '';
 $filterRegion  = isset($_GET['region_id']) ? (int)$_GET['region_id'] : 0;
 $filterSearch  = trim($_GET['q'] ?? '');
@@ -21,6 +32,15 @@ $sql = "SELECT l.*, p.name as project_name, r.name as region_name, u.name as ass
         WHERE 1=1";
 $params = [];
 
+// Telecall: show all leads from their assigned projects
+if ($isTelecall && $telecallProjectIds) {
+    $in = implode(',', array_fill(0, count($telecallProjectIds), '?'));
+    $sql .= " AND l.project_id IN ($in)";
+    $params = array_merge($params, $telecallProjectIds);
+} elseif ($isTelecall) {
+    $sql .= " AND 1=0"; // no projects assigned yet → show nothing
+}
+
 if ($filterProject) { $sql .= " AND l.project_id=?"; $params[] = $filterProject; }
 if ($filterStatus)  { $sql .= " AND l.status=?";     $params[] = $filterStatus; }
 if ($filterRegion)  { $sql .= " AND l.region_id=?";  $params[] = $filterRegion; }
@@ -30,12 +50,36 @@ $sql .= " ORDER BY l.created_at DESC";
 $stmt = $db->prepare($sql); $stmt->execute($params);
 $leads = $stmt->fetchAll();
 
-$projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
+// Projects: telecall sees only their assigned projects; investors see only theirs
+if ($isTelecall && $telecallProjectIds) {
+    $in = implode(',', array_fill(0, count($telecallProjectIds), '?'));
+    $projStmt = $db->prepare("SELECT id,name FROM projects WHERE status='active' AND id IN ($in) ORDER BY name");
+    $projStmt->execute($telecallProjectIds);
+    $projects = $projStmt->fetchAll();
+} else {
+    $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
+}
+
 $regions  = $db->query("SELECT id,name FROM regions WHERE status='active' ORDER BY name")->fetchAll();
 $agents   = $db->query("SELECT id,name FROM users WHERE role IN ('telecall','admin') AND status='active' ORDER BY name")->fetchAll();
 
-// Status counts
-$counts = $db->query("SELECT status, COUNT(*) as cnt FROM leads GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+// Status counts — scoped to the user's visible leads
+$countSql = "SELECT status, COUNT(*) as cnt FROM leads WHERE 1=1";
+$countParams = [];
+if ($isTelecall && $telecallProjectIds) {
+    $in = implode(',', array_fill(0, count($telecallProjectIds), '?'));
+    $countSql .= " AND project_id IN ($in)";
+    $countParams = array_merge($countParams, $telecallProjectIds);
+} elseif ($isTelecall) {
+    $countSql .= " AND 1=0";
+} elseif ($isInvestor && $investorProjectId) {
+    $countSql .= " AND project_id=?";
+    $countParams[] = $investorProjectId;
+}
+$countSql .= " GROUP BY status";
+$countStmt = $db->prepare($countSql);
+$countStmt->execute($countParams);
+$counts = $countStmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $pageTitle = 'Leads';
 include __DIR__ . '/../../includes/header.php';
@@ -84,6 +128,9 @@ include __DIR__ . '/../../includes/header.php';
         <?php if ($isInvestor): ?>
           <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
           <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[array_search($investorProjectId, array_column($projects, 'id'))]['name'] ?? 'My Project') ?>" disabled>
+        <?php elseif ($isTelecall && count($projects) === 1): ?>
+          <input type="hidden" name="project_id" value="<?= $projects[0]['id'] ?>">
+          <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[0]['name']) ?>" disabled>
         <?php else: ?>
         <select name="project_id" class="form-select form-select-sm">
           <option value="">All Projects</option>

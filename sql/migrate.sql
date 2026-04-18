@@ -375,6 +375,19 @@ CREATE TABLE IF NOT EXISTS demos (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- 19. TELECALL PROJECT ASSIGNMENTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS telecall_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    project_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_telecall_project (user_id, project_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Add missing columns to leads table for live databases
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS website VARCHAR(255) AFTER designation;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS address TEXT AFTER website;

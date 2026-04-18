@@ -39,21 +39,12 @@ if ($missing) {
 }
 
 // Load lookup maps
-$projectsRaw = $db->query("SELECT id, code FROM projects")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
-$projects = [];
-foreach ($projectsRaw as $pId => $pCode) {
-    if ($pCode) $projects[strtolower(trim((string)$pCode))] = $pId;
-}
-// Also try by name
 $projectsByName = $db->query("SELECT id, name FROM projects")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 $regions = $db->query("SELECT id, LOWER(name) as name FROM regions WHERE status='active'")->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 // Flip: name => id
 $regionMap = array_flip($regions);
 
-function findProject(array $projects, array $byName, string $code): ?int {
-    $codeLower = strtolower(trim($code));
-    if (isset($projects[$codeLower])) return (int)$projects[$codeLower];
-    // Try case-insensitive name match
+function findProject(array $byName, string $code): ?int {
     foreach ($byName as $id => $name) {
         if (strcasecmp($name, $code) === 0) return (int)$id;
     }
@@ -87,7 +78,7 @@ while (($row = fgetcsv($handle)) !== false) {
         continue;
     }
 
-    $projectId = findProject($projects, $projectsByName, $pCode);
+    $projectId = findProject($projectsByName, $pCode);
     if (!$projectId) {
         $errors[] = "Row $rowNum: Project '$pCode' not found.";
         $skipped++;

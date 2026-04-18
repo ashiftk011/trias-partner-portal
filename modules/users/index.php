@@ -44,6 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($role !== 'investor' && $id > 0) {
             $db->prepare("DELETE FROM investor_projects WHERE user_id=?")->execute([$id]);
         }
+        // Sync telecall project assignments (multi-select)
+        if ($role === 'telecall' && $id > 0) {
+            $telecallProjects = array_filter(array_map('intval', (array)($_POST['telecall_project_ids'] ?? [])));
+            $db->prepare("DELETE FROM telecall_projects WHERE user_id=?")->execute([$id]);
+            if ($telecallProjects) {
+                $ins = $db->prepare("INSERT IGNORE INTO telecall_projects (user_id, project_id) VALUES (?,?)");
+                foreach ($telecallProjects as $pid) { $ins->execute([$id, $pid]); }
+            }
+        } elseif ($role !== 'telecall' && $id > 0) {
+            $db->prepare("DELETE FROM telecall_projects WHERE user_id=?")->execute([$id]);
+        }
     } elseif ($action === 'toggle') {
         $id  = (int)$_POST['id'];
         $new = $_POST['new_status'];
@@ -54,10 +65,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $db    = getDB();
-$users = $db->query("SELECT u.*, ip.project_id as investor_project_id, p.name as investor_project_name
+$users = $db->query("SELECT u.*,
+                         ip.project_id as investor_project_id,
+                         p.name as investor_project_name,
+                         GROUP_CONCAT(DISTINCT tp.project_id ORDER BY tp.project_id SEPARATOR ',') as telecall_project_ids,
+                         GROUP_CONCAT(DISTINCT pp.name ORDER BY pp.name SEPARATOR ', ') as telecall_project_names
                      FROM users u
                      LEFT JOIN investor_projects ip ON ip.user_id = u.id
                      LEFT JOIN projects p ON p.id = ip.project_id
+                     LEFT JOIN telecall_projects tp ON tp.user_id = u.id
+                     LEFT JOIN projects pp ON pp.id = tp.project_id
+                     GROUP BY u.id
                      ORDER BY u.role, u.name")->fetchAll();
 $editUser = null;
 $projects = $db->query("SELECT id, name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
@@ -98,6 +116,10 @@ include __DIR__ . '/../../includes/header.php';
             <td>
               <?php if ($u['role'] === 'investor' && $u['investor_project_name']): ?>
                 <span class="badge bg-primary"><?= htmlspecialchars($u['investor_project_name']) ?></span>
+              <?php elseif ($u['role'] === 'telecall' && $u['telecall_project_names']): ?>
+                <?php foreach (explode(', ', $u['telecall_project_names']) as $pn): ?>
+                  <span class="badge bg-primary me-1"><?= htmlspecialchars($pn) ?></span>
+                <?php endforeach; ?>
               <?php else: ?>
                 <span class="text-muted small">-</span>
               <?php endif; ?>
@@ -175,6 +197,15 @@ include __DIR__ . '/../../includes/header.php';
               <?php endforeach; ?>
             </select>
           </div>
+          <div class="mb-3" id="telecallProjectField" style="display:none">
+            <label class="form-label">Assigned Projects</label>
+            <select name="telecall_project_ids[]" id="uTelecallProjects" class="form-select" multiple size="<?= min(5, count($projects)) ?>">
+              <?php foreach ($projects as $pr): ?>
+              <option value="<?= $pr['id'] ?>"><?= htmlspecialchars($pr['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div class="form-text">Hold <kbd>Ctrl</kbd> / <kbd>Cmd</kbd> to select multiple projects.</div>
+          </div>
           <div class="mb-3">
             <label class="form-label">Password <span id="pwdNote" class="text-muted small">(leave blank to keep current)</span></label>
             <input type="password" name="password" id="uPassword" class="form-control" placeholder="Min 6 characters">
@@ -206,24 +237,38 @@ function editUser(u) {
   document.getElementById('uStatus').value   = u.status;
   document.getElementById('modalTitle').textContent = 'Edit User';
   document.getElementById('pwdNote').textContent = '(leave blank to keep current)';
-  toggleInvestorProject(u.role);
+  toggleRoleFields(u.role);
   if (u.role === 'investor' && u.investor_project_id) {
     document.getElementById('uInvestorProject').value = u.investor_project_id;
+  }
+  if (u.role === 'telecall' && u.telecall_project_ids) {
+    const assigned = u.telecall_project_ids.toString().split(',').map(s => s.trim());
+    const sel = document.getElementById('uTelecallProjects');
+    Array.from(sel.options).forEach(opt => {
+      opt.selected = assigned.includes(opt.value);
+    });
   }
   new bootstrap.Modal(document.getElementById('userModal')).show();
 }
 
-function toggleInvestorProject(role) {
-  const field = document.getElementById('investorProjectField');
-  const sel   = document.getElementById('uInvestorProject');
+function toggleRoleFields(role) {
+  // Investor project (single)
+  const invField = document.getElementById('investorProjectField');
+  const invSel   = document.getElementById('uInvestorProject');
   if (role === 'investor') {
-    field.style.display = '';
-    sel.required = true;
+    invField.style.display = '';
+    invSel.required = true;
   } else {
-    field.style.display = 'none';
-    sel.required = false;
+    invField.style.display = 'none';
+    invSel.required = false;
   }
+  // Telecall projects (multi)
+  const tcField = document.getElementById('telecallProjectField');
+  tcField.style.display = (role === 'telecall') ? '' : 'none';
 }
+
+// Keep old name working for the inline onchange handler
+function toggleInvestorProject(role) { toggleRoleFields(role); }
 </script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>

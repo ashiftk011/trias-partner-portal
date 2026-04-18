@@ -7,7 +7,9 @@ $pageTitle = 'Dashboard';
 $db = getDB();
 $user = currentUser();
 $isInvestor = isRole('investor');
-$investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
+$isTelecall = isRole('telecall');
+$investorProjectId  = $isInvestor ? getInvestorProjectId() : 0;
+$telecallProjectIds = $isTelecall ? getTelecallProjectIds() : [];
 
 // Stats
 $stats = [];
@@ -18,6 +20,16 @@ if (hasAccess('leads')) {
         $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='new'"); $stmt->execute([$investorProjectId]); $stats['new_leads'] = $stmt->fetchColumn();
         $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='converted'"); $stmt->execute([$investorProjectId]); $stats['converted_leads'] = $stmt->fetchColumn();
         $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE project_id=? AND status='follow_up'"); $stmt->execute([$investorProjectId]); $stats['follow_up_leads'] = $stmt->fetchColumn();
+    } elseif ($isTelecall && $telecallProjectIds) {
+        $in = implode(',', array_fill(0, count($telecallProjectIds), '?'));
+        $tcWhere  = "project_id IN ($in)";
+        $tcParams = $telecallProjectIds;
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE $tcWhere"); $stmt->execute($tcParams); $stats['total_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE $tcWhere AND status='new'"); $stmt->execute($tcParams); $stats['new_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE $tcWhere AND status='converted'"); $stmt->execute($tcParams); $stats['converted_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE $tcWhere AND status='follow_up'"); $stmt->execute($tcParams); $stats['follow_up_leads'] = $stmt->fetchColumn();
+    } elseif ($isTelecall) {
+        $stats['total_leads'] = $stats['new_leads'] = $stats['converted_leads'] = $stats['follow_up_leads'] = 0;
     } else {
         $stats['total_leads']     = $db->query("SELECT COUNT(*) FROM leads")->fetchColumn();
         $stats['new_leads']       = $db->query("SELECT COUNT(*) FROM leads WHERE status='new'")->fetchColumn();
@@ -64,12 +76,17 @@ if (hasAccess('renewals')) {
     $stats['expiring_soon'] = $db->query("SELECT COUNT(*) FROM renewals WHERE status='active' AND end_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)")->fetchColumn();
 }
 
-// Recent leads (for telecall + admin)
+// Recent leads (scoped per role)
 $recentLeads = [];
 if (hasAccess('leads')) {
     if ($isInvestor && $investorProjectId) {
         $stmt = $db->prepare("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id WHERE l.project_id=? ORDER BY l.created_at DESC LIMIT 5");
         $stmt->execute([$investorProjectId]);
+        $recentLeads = $stmt->fetchAll();
+    } elseif ($isTelecall && $telecallProjectIds) {
+        $in = implode(',', array_fill(0, count($telecallProjectIds), '?'));
+        $stmt = $db->prepare("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id WHERE l.project_id IN ($in) ORDER BY l.created_at DESC LIMIT 5");
+        $stmt->execute($telecallProjectIds);
         $recentLeads = $stmt->fetchAll();
     } else {
         $stmt = $db->query("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id ORDER BY l.created_at DESC LIMIT 5");

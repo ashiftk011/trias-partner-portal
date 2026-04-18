@@ -53,6 +53,21 @@ function isRole(string ...$roles): bool {
     return in_array($_SESSION['user_role'] ?? '', $roles);
 }
 
+// Get all project IDs assigned to the currently logged-in telecall user
+function getTelecallProjectIds(): array {
+    static $cached = null;
+    if ($cached !== null) return $cached;
+    try {
+        $db = getDB();
+        $stmt = $db->prepare("SELECT project_id FROM telecall_projects WHERE user_id=?");
+        $stmt->execute([$_SESSION['user_id'] ?? 0]);
+        $cached = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } catch (\Exception $e) {
+        $cached = []; // table may not exist yet
+    }
+    return $cached;
+}
+
 // Get the project ID assigned to the currently logged-in investor
 function getInvestorProjectId(): int {
     static $cached = null;
