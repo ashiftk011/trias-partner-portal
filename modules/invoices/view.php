@@ -70,6 +70,11 @@ include __DIR__ . '/../../includes/header.php';
   </div>
   <div class="d-flex gap-2">
     <?= statusBadge($inv['status']) ?>
+    <?php if (!in_array($inv['status'],['paid','cancelled'])): ?>
+    <a href="<?= BASE_URL ?>/modules/invoices/edit.php?id=<?= $id ?>" class="btn btn-warning btn-sm">
+      <i class="bi bi-pencil-square me-1"></i>Edit
+    </a>
+    <?php endif; ?>
     <?php if (in_array($inv['status'],['pending','partial','overdue'])): ?>
     <a href="<?= BASE_URL ?>/modules/invoices/payment.php?invoice_id=<?= $id ?>" class="btn btn-success btn-sm">
       <i class="bi bi-cash-coin me-1"></i>Record Payment

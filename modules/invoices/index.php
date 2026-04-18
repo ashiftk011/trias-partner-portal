@@ -167,6 +167,9 @@ include __DIR__ . '/../../includes/header.php';
             <td class="text-center">
               <div class="btn-group btn-group-sm">
                 <a href="<?= BASE_URL ?>/modules/invoices/view.php?id=<?= $inv['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                <?php if (!in_array($inv['status'],['paid','cancelled'])): ?>
+                <a href="<?= BASE_URL ?>/modules/invoices/edit.php?id=<?= $inv['id'] ?>" class="btn btn-outline-warning" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                <?php endif; ?>
                 <?php if (in_array($inv['status'],['pending','partial','overdue'])): ?>
                 <a href="<?= BASE_URL ?>/modules/invoices/payment.php?invoice_id=<?= $inv['id'] ?>" class="btn btn-outline-success" title="Add Payment"><i class="bi bi-cash-coin"></i></a>
                 <?php endif; ?>
