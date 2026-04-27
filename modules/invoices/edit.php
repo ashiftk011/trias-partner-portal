@@ -31,6 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $taxPercent    = (float)$_POST['tax_percent'];
     $discountType  = ($_POST['discount_type'] ?? 'percent') === 'fixed' ? 'fixed' : 'percent';
     $notes         = trim($_POST['notes'] ?? '');
+    $termsRaw      = array_filter(array_map('trim', $_POST['terms_conditions'] ?? []));
+    $termsConditions = !empty($termsRaw) ? json_encode(array_values($termsRaw)) : null;
     $advanceAmount = max(0, (float)($_POST['advance_amount'] ?? 0));
     $advanceDate   = !empty($_POST['advance_date']) ? $_POST['advance_date'] : null;
 
@@ -80,8 +82,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newStatus = 'pending';
     }
 
-    $db->prepare("UPDATE invoices SET client_id=?,renewal_id=?,invoice_date=?,due_date=?,subtotal=?,discount_type=?,discount_percent=?,discount_amount=?,tax_percent=?,tax_amount=?,total_amount=?,advance_amount=?,advance_date=?,status=?,notes=? WHERE id=?")
-       ->execute([$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$newStatus,$notes,$id]);
+    $db->prepare("UPDATE invoices SET client_id=?,renewal_id=?,invoice_date=?,due_date=?,subtotal=?,discount_type=?,discount_percent=?,discount_amount=?,tax_percent=?,tax_amount=?,total_amount=?,advance_amount=?,advance_date=?,status=?,notes=?,terms_conditions=? WHERE id=?")
+       ->execute([$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$newStatus,$notes,$termsConditions,$id]);
 
     $db->prepare("DELETE FROM invoice_items WHERE invoice_id=?")->execute([$id]);
     $itemStmt = $db->prepare("INSERT INTO invoice_items (invoice_id,item_name,description,quantity,unit_price,amount) VALUES (?,?,?,?,?,?)");
@@ -204,7 +206,30 @@ include __DIR__ . '/../../includes/header.php';
           <div class="row mt-4">
             <div class="col-md-6">
               <label class="form-label">Notes</label>
-              <textarea name="notes" class="form-control" rows="3" placeholder="Payment terms, services included, etc."><?= htmlspecialchars($inv['notes'] ?? '') ?></textarea>
+              <textarea name="notes" class="form-control" rows="3" placeholder="Additional notes for this invoice (optional)"><?= htmlspecialchars($inv['notes'] ?? '') ?></textarea>
+
+              <div class="mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <label class="form-label mb-0">Terms &amp; Conditions</label>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="addTermBtn">
+                    <i class="bi bi-plus-circle me-1"></i>Add Condition
+                  </button>
+                </div>
+                <div id="termsList">
+                  <?php
+                  $existingTerms = [];
+                  if (!empty($inv['terms_conditions'])) {
+                    $decoded = json_decode($inv['terms_conditions'], true);
+                    if (is_array($decoded)) $existingTerms = $decoded;
+                  }
+                  foreach ($existingTerms as $term): ?>
+                  <div class="d-flex gap-2 mb-2 term-row">
+                    <input type="text" name="terms_conditions[]" class="form-control form-control-sm" placeholder="e.g. Payment due within 15 days" value="<?= htmlspecialchars($term) ?>">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-term" title="Remove"><i class="bi bi-x-lg"></i></button>
+                  </div>
+                  <?php endforeach; ?>
+                </div>
+              </div>
             </div>
             <div class="col-md-6">
               <div class="bg-light rounded p-3 border">
@@ -373,16 +398,39 @@ document.getElementById('discTypeToggle').addEventListener('click', function() {
   calcTotals();
 });
 
-$('#invClient').on('change', function() {
+document.getElementById('invClient').addEventListener('change', function() {
   const clientId = this.value;
-  $('#invRenewal').html('<option value="">None</option>');
+  const renewalSel = document.getElementById('invRenewal');
+  renewalSel.innerHTML = '<option value="">None</option>';
   if (clientId) {
-    $.getJSON('<?= BASE_URL ?>/modules/invoices/get_renewals.php?client_id='+clientId, function(data) {
-      data.forEach(r => {
-        $('#invRenewal').append(`<option value="${r.id}" data-amount="${r.amount}">${r.label}</option>`);
+    fetch('<?= BASE_URL ?>/modules/invoices/get_renewals.php?client_id=' + clientId)
+      .then(r => r.json())
+      .then(data => {
+        data.forEach(r => {
+          const opt = new Option(r.label, r.id);
+          opt.dataset.amount = r.amount;
+          renewalSel.appendChild(opt);
+        });
       });
-    });
   }
+});
+
+// ---- Terms & Conditions ----
+function addTermRow(value = '') {
+  const div = document.createElement('div');
+  div.className = 'd-flex gap-2 mb-2 term-row';
+  div.innerHTML = `
+    <input type="text" name="terms_conditions[]" class="form-control form-control-sm" placeholder="e.g. Payment due within 15 days" value="${value.replace(/"/g, '&quot;')}">
+    <button type="button" class="btn btn-sm btn-outline-danger remove-term" title="Remove"><i class="bi bi-x-lg"></i></button>
+  `;
+  div.querySelector('.remove-term').addEventListener('click', () => div.remove());
+  document.getElementById('termsList').appendChild(div);
+}
+document.getElementById('addTermBtn').addEventListener('click', () => addTermRow());
+
+// Attach remove handlers to pre-rendered rows
+document.querySelectorAll('#termsList .term-row').forEach(row => {
+  row.querySelector('.remove-term').addEventListener('click', () => row.remove());
 });
 
 calcTotals();

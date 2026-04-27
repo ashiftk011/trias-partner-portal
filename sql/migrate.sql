@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     paid_amount DECIMAL(10,2) DEFAULT 0.00,
     status ENUM('pending','paid','partial','overdue','cancelled') DEFAULT 'pending',
     notes TEXT,
+    terms_conditions TEXT,
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -402,3 +403,6 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_date DATE NULL AFTER advan
 -- Add item_name column to invoice_items for live databases
 ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(255) NOT NULL DEFAULT '' AFTER invoice_id;
 ALTER TABLE invoice_items MODIFY COLUMN description TEXT;
+
+-- Add terms_conditions column to invoices for live databases
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS terms_conditions TEXT NULL AFTER notes;

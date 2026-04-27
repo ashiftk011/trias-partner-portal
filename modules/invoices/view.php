@@ -258,9 +258,27 @@ include __DIR__ . '/../../includes/header.php';
           </table>
         </div>
 
-        <?php if ($inv['notes'] && !empty($lineItems)): ?>
+        <?php if (!empty(trim($inv['notes'] ?? ''))): ?>
         <div class="inv-notes-section">
           <strong>Notes:</strong> <?= nl2br(htmlspecialchars($inv['notes'])) ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        $termsItems = [];
+        if (!empty($inv['terms_conditions'])) {
+            $decoded = json_decode($inv['terms_conditions'], true);
+            if (is_array($decoded)) $termsItems = array_filter($decoded);
+        }
+        ?>
+        <?php if (!empty($termsItems)): ?>
+        <div class="inv-terms-section">
+          <div class="inv-terms-title">Terms &amp; Conditions</div>
+          <ol class="inv-terms-list">
+            <?php foreach ($termsItems as $term): ?>
+            <li><?= htmlspecialchars($term) ?></li>
+            <?php endforeach; ?>
+          </ol>
         </div>
         <?php endif; ?>
 
@@ -301,9 +319,14 @@ include __DIR__ . '/../../includes/header.php';
         <?php if ($payments): ?>
         <?php foreach ($payments as $py): ?>
         <div class="border-bottom p-3">
-          <div class="d-flex justify-content-between">
+          <div class="d-flex justify-content-between align-items-start">
             <span class="fw-semibold text-success">₹<?= number_format($py['amount'],2) ?></span>
-            <small class="text-muted"><?= date('d M Y', strtotime($py['payment_date'])) ?></small>
+            <div class="d-flex align-items-center gap-2">
+              <small class="text-muted"><?= date('d M Y', strtotime($py['payment_date'])) ?></small>
+              <a href="<?= BASE_URL ?>/modules/invoices/receipt.php?payment_id=<?= $py['id'] ?>" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" title="View Receipt" style="font-size:.7rem;line-height:1.6">
+                <i class="bi bi-receipt"></i> Receipt
+              </a>
+            </div>
           </div>
           <div class="small text-muted"><?= ucfirst($py['payment_mode']) ?><?= $py['transaction_id']?' • '.$py['transaction_id']:'' ?></div>
           <div class="small text-muted">By: <?= htmlspecialchars($py['by_name'] ?? '') ?></div>
@@ -531,6 +554,30 @@ include __DIR__ . '/../../includes/header.php';
   padding: 10px 14px;
   background: #f8fafc;
   border-radius: 6px;
+}
+
+/* Terms & Conditions */
+.inv-terms-section {
+  font-size: .82rem;
+  color: #475569;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  border-left: 3px solid #0ea5e9;
+}
+.inv-terms-title {
+  font-weight: 700;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #0ea5e9;
+  margin-bottom: 6px;
+}
+.inv-terms-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
 }
 
 /* Thank You */
