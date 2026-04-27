@@ -30,9 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status     = $_POST['status']  ?? 'draft';
     $notes      = trim($_POST['notes'] ?? '');
 
-    $descs  = $_POST['item_desc']  ?? [];
-    $qtys   = $_POST['item_qty']   ?? [];
-    $prices = $_POST['item_price'] ?? [];
+    $descs       = $_POST['item_desc']       ?? [];
+    $price_types = $_POST['item_price_type'] ?? [];
+    $qtys        = $_POST['item_qty']        ?? [];
+    $prices      = $_POST['item_price']      ?? [];
 
     $subtotal = 0;
     $lineItems = [];
@@ -40,12 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!trim($desc)) continue;
         $qty   = (float)($qtys[$i]   ?? 1);
         $price = (float)($prices[$i] ?? 0);
+        $ptype = $price_types[$i] ?? 'one_time';
         $amt   = round($qty * $price, 2);
         $subtotal += $amt;
-        $lineItems[] = ['desc'=>trim($desc),'qty'=>$qty,'price'=>$price,'amount'=>$amt];
+        $lineItems[] = ['desc'=>trim($desc),'price_type'=>$ptype,'qty'=>$qty,'price'=>$price,'amount'=>$amt];
     }
+    $discount = (float)($_POST['discount'] ?? 0);
     $taxAmt = round($subtotal * $tax_percent / 100, 2);
-    $total  = $subtotal + $taxAmt;
+    $total  = max(0, $subtotal + $taxAmt - $discount);
 
     if (!$title || !$project_id) {
         setFlash('error','Title and Project are required.');
@@ -54,9 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $db->prepare("UPDATE quotations SET title=?,project_id=?,lead_id=?,client_id=?,valid_until=?,
-            subtotal=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=? WHERE id=?")
+            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=? WHERE id=?")
            ->execute([$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$tax_percent,$taxAmt,$total,$status,$notes,$id]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$total,$status,$notes,$id]);
         $db->prepare("DELETE FROM quotation_items WHERE quotation_id=?")->execute([$id]);
         setFlash('success','Quotation updated.');
     } else {
@@ -64,16 +67,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $num  = $last && preg_match('/QTN-(\d+)/', $last, $m) ? (int)$m[1]+1 : 1;
         $no   = 'QTN-'.str_pad($num, 4, '0', STR_PAD_LEFT);
         $db->prepare("INSERT INTO quotations (quotation_no,title,project_id,lead_id,client_id,valid_until,
-            subtotal,tax_percent,tax_amount,total_amount,status,notes,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
            ->execute([$no,$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$tax_percent,$taxAmt,$total,$status,$notes,$user['id']]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$total,$status,$notes,$user['id']]);
         $id = (int)$db->lastInsertId();
         setFlash('success',"Quotation $no created.");
     }
 
-    $ins = $db->prepare("INSERT INTO quotation_items (quotation_id,description,quantity,unit_price,amount) VALUES (?,?,?,?,?)");
-    foreach ($lineItems as $li) { $ins->execute([$id,$li['desc'],$li['qty'],$li['price'],$li['amount']]); }
+    $ins = $db->prepare("INSERT INTO quotation_items (quotation_id,description,price_type,quantity,unit_price,amount) VALUES (?,?,?,?,?,?)");
+    foreach ($lineItems as $li) { $ins->execute([$id,$li['desc'],$li['price_type'],$li['qty'],$li['price'],$li['amount']]); }
 
     redirect(BASE_URL.'/modules/quotations/save.php?id='.$id);
 }
@@ -83,7 +86,7 @@ $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetch
 $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
 
 $q = $quotation ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','valid_until'=>'',
-     'subtotal'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>''];
+     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>''];
 
 $pageTitle = $id ? 'Edit Quotation' : 'New Quotation';
 include __DIR__ . '/../../includes/header.php';
@@ -166,16 +169,23 @@ include __DIR__ . '/../../includes/header.php';
         <div class="card-body p-0">
           <table class="table mb-0" id="itemsTable">
             <thead class="table-light">
-              <tr><th>Description</th><th style="width:100px">Qty</th><th style="width:130px">Unit Price</th><th style="width:130px">Amount</th><th style="width:40px"></th></tr>
+              <tr><th>Description</th><th style="width:140px">Price Type</th><th style="width:100px">Qty</th><th style="width:130px">Unit Price</th><th style="width:130px">Amount</th><th style="width:40px"></th></tr>
             </thead>
             <tbody id="itemsBody">
-              <?php $rowItems = $items ?: [['description'=>'','quantity'=>1,'unit_price'=>0,'amount'=>0]]; ?>
+              <?php $rowItems = $items ?: [['description'=>'','price_type'=>'one_time','quantity'=>1,'unit_price'=>0,'amount'=>0]]; ?>
               <?php foreach ($rowItems as $li): ?>
               <tr>
                 <td><input type="text" name="item_desc[]" class="form-control form-control-sm" value="<?= htmlspecialchars($li['description']) ?>" placeholder="Item description" required></td>
+                <td>
+                  <select name="item_price_type[]" class="form-select form-select-sm">
+                    <option value="one_time" <?= ($li['price_type'] ?? 'one_time') === 'one_time' ? 'selected' : '' ?>>One-time</option>
+                    <option value="monthly" <?= ($li['price_type'] ?? '') === 'monthly' ? 'selected' : '' ?>>Monthly</option>
+                    <option value="yearly" <?= ($li['price_type'] ?? '') === 'yearly' ? 'selected' : '' ?>>Yearly</option>
+                  </select>
+                </td>
                 <td><input type="number" name="item_qty[]" class="form-control form-control-sm item-qty" value="<?= $li['quantity'] ?>" step="0.01" min="0.01" required></td>
                 <td><input type="number" name="item_price[]" class="form-control form-control-sm item-price" value="<?= $li['unit_price'] ?>" step="0.01" min="0" required></td>
-                <td><input type="text" class="form-control form-control-sm item-amount bg-light" value="<?= number_format($li['amount'], 2) ?>" readonly></td>
+                <td><input type="text" class="form-control form-control-sm item-amount bg-light" value="<?= number_format($li['amount'], 2, '.', '') ?>" readonly></td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
               </tr>
               <?php endforeach; ?>
@@ -197,6 +207,10 @@ include __DIR__ . '/../../includes/header.php';
           <div class="mb-3">
             <label class="form-label small fw-semibold">GST %</label>
             <input type="number" name="tax_percent" id="taxInput" class="form-control" value="<?= $q['tax_percent'] ?>" step="0.01" min="0" max="100">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Discount</label>
+            <input type="number" name="discount" id="discountInput" class="form-control" value="<?= $q['discount'] ?>" step="0.01" min="0">
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Tax Amount</span>
@@ -237,9 +251,10 @@ function calcRow(row) {
 function recalcTotals() {
   let sub = 0;
   document.querySelectorAll('.item-amount').forEach(el => sub += parseFloat(el.value) || 0);
+  const discount = parseFloat(document.getElementById('discountInput').value) || 0;
   const tax  = (parseFloat(document.getElementById('taxInput').value) || 0) / 100;
   const taxAmt = sub * tax;
-  const total  = sub + taxAmt;
+  const total  = Math.max(0, sub + taxAmt - discount);
   document.getElementById('subtotalDisplay').textContent = '₹' + sub.toFixed(2);
   document.getElementById('taxDisplay').textContent      = '₹' + taxAmt.toFixed(2);
   document.getElementById('totalDisplay').textContent    = '₹' + total.toFixed(2);
@@ -268,6 +283,7 @@ function attachRowEvents(row) {
 
 document.querySelectorAll('#itemsBody tr').forEach(attachRowEvents);
 document.getElementById('taxInput').addEventListener('input', recalcTotals);
+document.getElementById('discountInput').addEventListener('input', recalcTotals);
 recalcTotals();
 </script>
 

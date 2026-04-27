@@ -112,6 +112,7 @@ include __DIR__ . '/../../includes/header.php';
             <td><small class="text-muted"><?= htmlspecialchars($q['created_by_name'] ?? '-') ?></small></td>
             <td>
               <div class="btn-group btn-group-sm">
+                <a href="<?= BASE_URL ?>/modules/quotations/view.php?id=<?= $q['id'] ?>" class="btn btn-outline-info" title="View/Print"><i class="bi bi-printer"></i></a>
                 <a href="<?= BASE_URL ?>/modules/quotations/save.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
                 <?php if (isRole('admin')): ?>
                 <form method="POST" action="<?= BASE_URL ?>/modules/quotations/delete.php" class="d-inline" onsubmit="return confirm('Delete this quotation?')">
