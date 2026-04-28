@@ -414,3 +414,6 @@ ALTER TABLE quotations ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0
 ALTER TABLE quotations ADD COLUMN IF NOT EXISTS terms_conditions TEXT AFTER notes;
 ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS price_type VARCHAR(50) DEFAULT 'one_time' AFTER description;
 
+-- Add default terms for quotations and invoices to projects table
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS default_quotation_terms TEXT AFTER status;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS default_invoice_terms TEXT AFTER default_quotation_terms;

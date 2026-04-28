@@ -15,11 +15,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $desc   = trim($_POST['description'] ?? '');
         $status = $_POST['status'];
 
+        $q_terms = trim($_POST['default_quotation_terms'] ?? '');
+        $i_terms = trim($_POST['default_invoice_terms'] ?? '');
+
         if ($id > 0) {
-            $db->prepare("UPDATE projects SET name=?,description=?,status=? WHERE id=?")->execute([$name,$desc,$status,$id]);
+            $db->prepare("UPDATE projects SET name=?,description=?,status=?,default_quotation_terms=?,default_invoice_terms=? WHERE id=?")
+               ->execute([$name,$desc,$status,$q_terms,$i_terms,$id]);
             setFlash('success','Project updated.');
         } else {
-            $db->prepare("INSERT INTO projects (name,description,status) VALUES (?,?,?)")->execute([$name,$desc,$status]);
+            $db->prepare("INSERT INTO projects (name,description,status,default_quotation_terms,default_invoice_terms) VALUES (?,?,?,?,?)")
+               ->execute([$name,$desc,$status,$q_terms,$i_terms]);
             setFlash('success','Project created.');
         }
     } elseif ($action === 'delete') {
@@ -128,6 +133,14 @@ include __DIR__ . '/../../includes/header.php';
               <option value="inactive">Inactive</option>
             </select>
           </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-primary">Default Quotation Terms</label>
+            <textarea name="default_quotation_terms" id="pQTerms" class="form-control" rows="3" placeholder="Enter each term on a new line..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold text-success">Default Invoice Terms</label>
+            <textarea name="default_invoice_terms" id="pITerms" class="form-control" rows="3" placeholder="Enter each term on a new line..."></textarea>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -144,6 +157,8 @@ function editProject(p) {
   document.getElementById('pName').value     = p.name;
   document.getElementById('pDesc').value     = p.description || '';
   document.getElementById('pStatus').value   = p.status;
+  document.getElementById('pQTerms').value   = p.default_quotation_terms || '';
+  document.getElementById('pITerms').value   = p.default_invoice_terms || '';
   document.getElementById('projectModalTitle').textContent = 'Edit Project';
   new bootstrap.Modal(document.getElementById('projectModal')).show();
 }

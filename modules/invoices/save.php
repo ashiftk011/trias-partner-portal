@@ -404,16 +404,32 @@ document.getElementById('invClient').addEventListener('change', function() {
   const renewalSel = document.getElementById('invRenewal');
   renewalSel.innerHTML = '<option value="">None</option>';
   if (clientId) {
-    fetch('<?= BASE_URL ?>/modules/invoices/get_renewals.php?client_id=' + clientId)
-      .then(r => r.json())
-      .then(data => {
-        data.forEach(r => {
-          const opt = new Option(r.label, r.id);
-          opt.dataset.amount = r.amount;
-          renewalSel.appendChild(opt);
-        });
+  fetch('<?= BASE_URL ?>/modules/invoices/get_renewals.php?client_id=' + clientId)
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(r => {
+        const opt = new Option(r.label, r.id);
+        opt.dataset.amount = r.amount;
+        renewalSel.appendChild(opt);
       });
-  }
+    });
+
+    // Fetch default terms for the client's project
+  fetch('<?= BASE_URL ?>/modules/clients/get_client.php?id=' + clientId)
+    .then(r => r.json())
+    .then(c => {
+      if (c.default_invoice_terms) {
+        const currentTerms = document.querySelectorAll('#termsList .term-row');
+        if (currentTerms.length > 0) {
+          if (!confirm('Load default terms for this client\'s project? This will NOT remove your existing terms.')) return;
+        }
+        const terms = c.default_invoice_terms.split('\n');
+        terms.forEach(t => {
+          if (t.trim()) addTermRow(t.trim());
+        });
+      }
+    });
+}
 });
 
 // ---- Terms & Conditions ----

@@ -121,7 +121,7 @@ include __DIR__ . '/../../includes/header.php';
             </div>
             <div class="col-md-4">
               <label class="form-label small fw-semibold">Project <span class="text-danger">*</span></label>
-              <select name="project_id" class="form-select" required>
+              <select name="project_id" id="quotationProject" class="form-select" required>
                 <option value="">Select Project</option>
                 <?php foreach ($projects as $pr): ?>
                 <option value="<?= $pr['id'] ?>" <?= $q['project_id']==$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
@@ -358,6 +358,29 @@ document.querySelectorAll('#termsList .remove-term').forEach(btn => {
          container.insertAdjacentHTML('afterend', '<p class="text-muted small mb-0" id="noTermsMsg">No terms added. Click + to add.</p>');
     }
   });
+});
+
+// Load Default Project Terms
+document.getElementById('quotationProject').addEventListener('change', function() {
+  const projectId = this.value;
+  if (!projectId) return;
+
+  // Only auto-load if terms list is empty to prevent overwriting
+  const currentTerms = document.querySelectorAll('#termsList .term-row');
+  if (currentTerms.length > 0) {
+    if (!confirm('Load default terms for this project? This will NOT remove your existing terms.')) return;
+  }
+
+  fetch('<?= BASE_URL ?>/modules/projects/get_project.php?id=' + projectId)
+    .then(r => r.json())
+    .then(p => {
+      if (p.default_quotation_terms) {
+        const terms = p.default_quotation_terms.split('\n');
+        terms.forEach(t => {
+          if (t.trim()) addTermRow(t.trim());
+        });
+      }
+    });
 });
 
 recalcTotals();

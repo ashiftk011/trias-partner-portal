@@ -33,6 +33,8 @@ CREATE TABLE projects (
     description TEXT,
     logo VARCHAR(255),
     status ENUM('active', 'inactive') DEFAULT 'active',
+    default_quotation_terms TEXT,
+    default_invoice_terms TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
