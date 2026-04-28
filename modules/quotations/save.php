@@ -46,9 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subtotal += $amt;
         $lineItems[] = ['desc'=>trim($desc),'price_type'=>$ptype,'qty'=>$qty,'price'=>$price,'amount'=>$amt];
     }
-    $discount = (float)($_POST['discount'] ?? 0);
-    $taxAmt = round($subtotal * $tax_percent / 100, 2);
-    $total  = max(0, $subtotal + $taxAmt - $discount);
+    $taxAmt      = round($subtotal * $tax_percent / 100, 2);
+    $totalAmount = $subtotal + $taxAmt;
+    $discount    = (float)($_POST['discount'] ?? 0);
+    $netPayable  = max(0, $totalAmount - $discount);
+
+    $termsRaw    = array_filter(array_map('trim', $_POST['terms_conditions'] ?? []));
+    $termsJson   = !empty($termsRaw) ? json_encode(array_values($termsRaw)) : null;
 
     if (!$title || !$project_id) {
         setFlash('error','Title and Project are required.');
@@ -57,9 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $db->prepare("UPDATE quotations SET title=?,project_id=?,lead_id=?,client_id=?,valid_until=?,
-            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=? WHERE id=?")
+            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=?,terms_conditions=? WHERE id=?")
            ->execute([$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$total,$status,$notes,$id]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$id]);
         $db->prepare("DELETE FROM quotation_items WHERE quotation_id=?")->execute([$id]);
         setFlash('success','Quotation updated.');
     } else {
@@ -67,10 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $num  = $last && preg_match('/QTN-(\d+)/', $last, $m) ? (int)$m[1]+1 : 1;
         $no   = 'QTN-'.str_pad($num, 4, '0', STR_PAD_LEFT);
         $db->prepare("INSERT INTO quotations (quotation_no,title,project_id,lead_id,client_id,valid_until,
-            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,terms_conditions,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
            ->execute([$no,$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$total,$status,$notes,$user['id']]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$user['id']]);
         $id = (int)$db->lastInsertId();
         setFlash('success',"Quotation $no created.");
     }
@@ -86,7 +90,7 @@ $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetch
 $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
 
 $q = $quotation ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','valid_until'=>'',
-     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>''];
+     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null];
 
 $pageTitle = $id ? 'Edit Quotation' : 'New Quotation';
 include __DIR__ . '/../../includes/header.php';
@@ -204,30 +208,64 @@ include __DIR__ . '/../../includes/header.php';
             <span class="text-muted">Subtotal</span>
             <span class="fw-semibold" id="subtotalDisplay">₹0.00</span>
           </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">GST %</label>
-            <input type="number" name="tax_percent" id="taxInput" class="form-control" value="<?= $q['tax_percent'] ?>" step="0.01" min="0" max="100">
-          </div>
-          <div class="mb-3">
-            <label class="form-label small fw-semibold">Discount</label>
-            <input type="number" name="discount" id="discountInput" class="form-control" value="<?= $q['discount'] ?>" step="0.01" min="0">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-6"><label class="form-label small fw-semibold mb-0">GST %</label></div>
+            <div class="col-6 text-end">
+              <input type="number" name="tax_percent" id="taxInput" class="form-control form-control-sm text-end" value="<?= $q['tax_percent'] ?>" step="0.01" min="0" max="100">
+            </div>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Tax Amount</span>
-            <span class="text-muted" id="taxDisplay">₹0.00</span>
+            <span id="taxDisplay">₹0.00</span>
+          </div>
+          <div class="d-flex justify-content-between border-top pt-2 mb-3">
+            <span class="fw-semibold">Total Amount</span>
+            <span class="fw-semibold" id="totalAmountDisplay">₹0.00</span>
+          </div>
+          <div class="row g-2 align-items-center mb-3">
+            <div class="col-6"><label class="form-label small fw-semibold mb-0">Discount (₹)</label></div>
+            <div class="col-6 text-end">
+              <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end" value="<?= $q['discount'] ?>" step="0.01" min="0">
+            </div>
           </div>
           <hr>
           <div class="d-flex justify-content-between">
-            <span class="fw-bold fs-5">Total</span>
-            <span class="fw-bold fs-5 text-primary" id="totalDisplay">₹0.00</span>
+            <span class="fw-bold fs-5">Net Payable</span>
+            <span class="fw-bold fs-5 text-primary" id="netPayableDisplay">₹0.00</span>
           </div>
         </div>
       </div>
 
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-chat-left-text me-2 text-primary"></i>Notes</div>
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-shield-check me-2 text-primary"></i>Terms &amp; Conditions</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="addTermBtn"><i class="bi bi-plus"></i></button>
+        </div>
         <div class="card-body">
-          <textarea name="notes" class="form-control" rows="5" placeholder="Terms, validity, or remarks..."><?= htmlspecialchars($q['notes']) ?></textarea>
+          <div id="termsList">
+            <?php
+            $existingTerms = [];
+            if (!empty($q['terms_conditions'])) {
+              $decoded = json_decode($q['terms_conditions'], true);
+              if (is_array($decoded)) $existingTerms = $decoded;
+            }
+            foreach ($existingTerms as $term): ?>
+            <div class="d-flex gap-2 mb-2 term-row">
+              <input type="text" name="terms_conditions[]" class="form-control form-control-sm" value="<?= htmlspecialchars($term) ?>">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-term"><i class="bi bi-x"></i></button>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php if (empty($existingTerms)): ?>
+          <p class="text-muted small mb-0" id="noTermsMsg">No terms added. Click + to add.</p>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-chat-left-text me-2 text-primary"></i>General Notes</div>
+        <div class="card-body">
+          <textarea name="notes" class="form-control" rows="3" placeholder="Remarks (Internal use or extra info)..."><?= htmlspecialchars($q['notes']) ?></textarea>
         </div>
       </div>
     </div>
@@ -251,13 +289,17 @@ function calcRow(row) {
 function recalcTotals() {
   let sub = 0;
   document.querySelectorAll('.item-amount').forEach(el => sub += parseFloat(el.value) || 0);
+  const taxPct  = parseFloat(document.getElementById('taxInput').value) || 0;
   const discount = parseFloat(document.getElementById('discountInput').value) || 0;
-  const tax  = (parseFloat(document.getElementById('taxInput').value) || 0) / 100;
-  const taxAmt = sub * tax;
-  const total  = Math.max(0, sub + taxAmt - discount);
-  document.getElementById('subtotalDisplay').textContent = '₹' + sub.toFixed(2);
-  document.getElementById('taxDisplay').textContent      = '₹' + taxAmt.toFixed(2);
-  document.getElementById('totalDisplay').textContent    = '₹' + total.toFixed(2);
+
+  const taxAmt = sub * taxPct / 100;
+  const totalAmount = sub + taxAmt;
+  const netPayable  = Math.max(0, totalAmount - discount);
+
+  document.getElementById('subtotalDisplay').textContent    = '₹' + sub.toFixed(2);
+  document.getElementById('taxDisplay').textContent         = '₹' + taxAmt.toFixed(2);
+  document.getElementById('totalAmountDisplay').textContent = '₹' + totalAmount.toFixed(2);
+  document.getElementById('netPayableDisplay').textContent  = '₹' + netPayable.toFixed(2);
 }
 
 function addRow() {
@@ -284,6 +326,40 @@ function attachRowEvents(row) {
 document.querySelectorAll('#itemsBody tr').forEach(attachRowEvents);
 document.getElementById('taxInput').addEventListener('input', recalcTotals);
 document.getElementById('discountInput').addEventListener('input', recalcTotals);
+
+// Terms & Conditions Logic
+function addTermRow(val = '') {
+  const container = document.getElementById('termsList');
+  const msg = document.getElementById('noTermsMsg');
+  if (msg) msg.remove();
+
+  const div = document.createElement('div');
+  div.className = 'd-flex gap-2 mb-2 term-row';
+  div.innerHTML = `
+    <input type="text" name="terms_conditions[]" class="form-control form-control-sm" value="${val.replace(/"/g, '&quot;')}" placeholder="e.g. Validity 30 days">
+    <button type="button" class="btn btn-sm btn-outline-danger remove-term"><i class="bi bi-x"></i></button>
+  `;
+  div.querySelector('.remove-term').addEventListener('click', () => {
+    div.remove();
+    if (container.querySelectorAll('.term-row').length === 0) {
+      container.insertAdjacentHTML('afterend', '<p class="text-muted small mb-0" id="noTermsMsg">No terms added. Click + to add.</p>');
+    }
+  });
+  container.appendChild(div);
+}
+
+document.getElementById('addTermBtn').addEventListener('click', () => addTermRow());
+document.querySelectorAll('#termsList .remove-term').forEach(btn => {
+  btn.addEventListener('click', function() {
+    this.closest('.term-row').remove();
+    const container = document.getElementById('termsList');
+    if (container.querySelectorAll('.term-row').length === 0) {
+       if (!document.getElementById('noTermsMsg'))
+         container.insertAdjacentHTML('afterend', '<p class="text-muted small mb-0" id="noTermsMsg">No terms added. Click + to add.</p>');
+    }
+  });
+});
+
 recalcTotals();
 </script>
 

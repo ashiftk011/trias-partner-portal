@@ -408,3 +408,9 @@ ALTER TABLE invoice_items MODIFY COLUMN description TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS terms_conditions TEXT NULL AFTER notes;
 ALTER TABLE quotations ADD discount DECIMAL(10,2) DEFAULT 0.00 AFTER subtotal;
 ALTER TABLE quotation_items ADD price_type ENUM('one_time', 'monthly', 'yearly') DEFAULT 'one_time' AFTER description
+
+-- Migration to add terms_conditions and discount to quotations
+ALTER TABLE quotations ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0.00 AFTER subtotal;
+ALTER TABLE quotations ADD COLUMN IF NOT EXISTS terms_conditions TEXT AFTER notes;
+ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS price_type VARCHAR(50) DEFAULT 'one_time' AFTER description;
+

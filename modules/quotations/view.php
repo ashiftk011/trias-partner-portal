@@ -195,6 +195,10 @@ include __DIR__ . '/../../includes/header.php';
                 <td class="text-end">₹<?= number_format($inv['tax_amount'], 2) ?></td>
               </tr>
               <?php endif; ?>
+              <tr class="fw-bold">
+                <td colspan="4" class="text-end">Total Amount:</td>
+                <td class="text-end">₹<?= number_format($inv['subtotal'] + $inv['tax_amount'], 2) ?></td>
+              </tr>
               <?php if ($discountAmount > 0): ?>
               <tr>
                 <td colspan="4" class="text-end">Discount:</td>
@@ -202,7 +206,7 @@ include __DIR__ . '/../../includes/header.php';
               </tr>
               <?php endif; ?>
               <tr class="inv-total-row" style="border-top-color: #6366f1;">
-                <td colspan="4" class="text-end"><strong>Total</strong></td>
+                <td colspan="4" class="text-end"><strong>Net Payable</strong></td>
                 <td class="text-end"><strong style="color: #6366f1; font-size: 1.1rem;">₹<?= number_format($inv['total_amount'], 2) ?></strong></td>
               </tr>
               <tr>
@@ -215,9 +219,23 @@ include __DIR__ . '/../../includes/header.php';
           </table>
         </div>
 
+        <?php if (!empty(trim($inv['terms_conditions'] ?? ''))): ?>
+        <div class="inv-notes-section">
+          <strong style="color: #6366f1; text-transform: uppercase; font-size: 0.75rem;">Terms &amp; Conditions:</strong>
+          <ul class="ps-3 mb-0 mt-1" style="list-style-type: decimal;">
+            <?php
+            $terms = json_decode($inv['terms_conditions'], true);
+            if (is_array($terms)) {
+              foreach ($terms as $t) { echo '<li>' . htmlspecialchars($t) . '</li>'; }
+            }
+            ?>
+          </ul>
+        </div>
+        <?php endif; ?>
+
         <?php if (!empty(trim($inv['notes'] ?? ''))): ?>
         <div class="inv-notes-section">
-          <strong>Notes &amp; Terms:</strong><br>
+          <strong style="color: #6366f1; text-transform: uppercase; font-size: 0.75rem;">General Remarks:</strong><br>
           <?= nl2br(htmlspecialchars($inv['notes'])) ?>
         </div>
         <?php endif; ?>
