@@ -458,15 +458,20 @@ include __DIR__ . '/../../includes/header.php';
   padding: 10px 14px;
   background: #f8fafc;
   border-radius: 6px;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 /* Thank You */
 .inv-thankyou {
   font-size: 1rem;
   font-weight: 700;
+  color: #6366f1;
   margin-top: 30px;
   padding-top: 16px;
   padding-bottom: 30px;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 /* ===== Print ===== */
@@ -477,7 +482,7 @@ include __DIR__ . '/../../includes/header.php';
   body { background: white !important; }
   .card { box-shadow: none !important; border: none !important; }
   .inv-content { padding: 10px 20px; }
-  .inv-body { min-height: 100vh; }
+  .inv-body { min-height: 100vh; overflow: visible !important; }
   .inv-watermark { opacity: 0.05 !important; }
   .inv-watermark img { max-width: 500px; max-height: 500px; }
 }

@@ -554,6 +554,8 @@ include __DIR__ . '/../../includes/header.php';
   padding: 10px 14px;
   background: #f8fafc;
   border-radius: 6px;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 
 /* Terms & Conditions */
@@ -565,6 +567,8 @@ include __DIR__ . '/../../includes/header.php';
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   border-left: 3px solid #0ea5e9;
+  page-break-inside: avoid;
+  break-inside: avoid;
 }
 .inv-terms-title {
   font-weight: 700;
