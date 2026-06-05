@@ -417,3 +417,7 @@ ALTER TABLE quotation_items ADD COLUMN IF NOT EXISTS price_type VARCHAR(50) DEFA
 -- Add default terms for quotations and invoices to projects table
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS default_quotation_terms TEXT AFTER status;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS default_invoice_terms TEXT AFTER default_quotation_terms;
+
+-- Add multi-currency support to quotations and invoices
+ALTER TABLE quotations ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'INR' AFTER title;
+ALTER TABLE invoices   ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'INR' AFTER terms_conditions;

@@ -7,6 +7,7 @@ $db = getDB();
 $user       = currentUser();
 $isInvestor = isRole('investor');
 $isTelecall = isRole('telecall');
+$isAdmin    = isRole('admin');
 $investorProjectId    = $isInvestor ? getInvestorProjectId() : 0;
 $telecallProjectIds   = $isTelecall ? getTelecallProjectIds() : [];
 
@@ -163,16 +164,55 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 </div>
 
+<!-- Bulk Actions Bar -->
+<?php if ($isAdmin): ?>
+<div id="bulkActionsBar" class="d-none alert alert-danger border-0 d-flex justify-content-between align-items-center mb-3 py-3 px-4 shadow-sm" style="border-radius: 12px; background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);">
+  <div class="d-flex align-items-center gap-2 text-danger">
+    <i class="bi bi-trash3-fill fs-5"></i>
+    <div>
+      <span class="fw-bold" id="selectedCount">0</span> leads selected for bulk action
+      <div class="text-muted small">Only leads with "Not Interested" status can be deleted.</div>
+    </div>
+  </div>
+  <div>
+    <button type="button" class="btn btn-danger btn-sm px-3 py-2 fw-semibold" onclick="confirmBulkDelete()">
+      <i class="bi bi-trash me-1"></i> Delete Selected
+    </button>
+  </div>
+</div>
+
+<form id="bulkDeleteForm" method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-none">
+  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="bulk" value="1">
+  <div id="bulkDeleteInputs"></div>
+</form>
+<?php endif; ?>
+
 <div class="card border-0 shadow-sm">
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0 datatable">
         <thead class="table-light">
-          <tr><th>Code</th><th>Lead</th><th>Contact</th><th>Project</th><th>Region</th><th>Source</th><th>Status</th><th>Assigned</th><th>Date</th><th>Actions</th></tr>
+          <tr>
+            <?php if ($isAdmin): ?>
+            <th data-orderable="false" data-searchable="false" width="40" class="text-center">
+              <input type="checkbox" id="selectAllLeads" class="form-check-input">
+            </th>
+            <?php endif; ?>
+            <th>Code</th><th>Lead</th><th>Contact</th><th>Project</th><th>Region</th><th>Source</th><th>Status</th><th>Assigned</th><th>Date</th><th>Actions</th></tr>
         </thead>
         <tbody>
           <?php foreach ($leads as $l): ?>
           <tr>
+            <?php if ($isAdmin): ?>
+            <td class="text-center">
+              <?php if ($l['status'] === 'not_interested'): ?>
+              <input type="checkbox" value="<?= $l['id'] ?>" class="form-check-input lead-select-checkbox">
+              <?php else: ?>
+              <input type="checkbox" class="form-check-input" disabled title="Only 'Not Interested' leads can be deleted.">
+              <?php endif; ?>
+            </td>
+            <?php endif; ?>
             <td><small class="text-muted"><?= htmlspecialchars($l['lead_code'] ?? '') ?></small></td>
             <td>
               <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="fw-semibold text-decoration-none">
@@ -200,6 +240,9 @@ include __DIR__ . '/../../includes/header.php';
                 <?php if ($l['status'] !== 'converted' && hasAccess('clients')): ?>
                 <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $l['id'] ?>" class="btn btn-outline-success" title="Convert to Client"><i class="bi bi-person-check"></i></a>
                 <?php endif; ?>
+                <?php endif; ?>
+                <?php if ($isAdmin && $l['status'] === 'not_interested'): ?>
+                <button type="button" class="btn btn-outline-danger btn-delete-lead" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                 <?php endif; ?>
               </div>
             </td>
@@ -365,8 +408,6 @@ function loadPlans(projectId, selectedId = '') {
   $(sel).trigger('change');
 }
 
-$('#lProject').on('change', function() { loadPlans(this.value); });
-
 function editLead(l) {
   document.getElementById('leadId').value         = l.id;
   document.getElementById('lName').value          = l.name;
@@ -386,6 +427,96 @@ function editLead(l) {
   document.getElementById('leadModalTitle').textContent = 'Edit Lead';
   new bootstrap.Modal(document.getElementById('leadModal')).show();
 }
+
+<?php if ($isAdmin): ?>
+function updateBulkActionsBar() {
+  const checkedCount = $('.lead-select-checkbox:checked').length;
+  const bar = document.getElementById('bulkActionsBar');
+  const countSpan = document.getElementById('selectedCount');
+  
+  if (bar && countSpan) {
+    if (checkedCount > 0) {
+      bar.classList.remove('d-none');
+      countSpan.textContent = checkedCount;
+    } else {
+      bar.classList.add('d-none');
+    }
+  }
+}
+
+function confirmBulkDelete() {
+  const checkboxes = document.querySelectorAll('.lead-select-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one lead to delete.');
+    return;
+  }
+  if (confirm(`Are you sure you want to delete the ${checkboxes.length} selected lead(s)? This action cannot be undone.`)) {
+    const container = document.getElementById('bulkDeleteInputs');
+    container.innerHTML = ''; // clear first
+    checkboxes.forEach(cb => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'lead_ids[]';
+      input.value = cb.value;
+      container.appendChild(input);
+    });
+    document.getElementById('bulkDeleteForm').submit();
+  }
+}
+
+<?php endif; ?>
+
+window.addEventListener('DOMContentLoaded', () => {
+  $('#lProject').on('change', function() { loadPlans(this.value); });
+
+  <?php if ($isAdmin): ?>
+  // Checkbox select all logic
+  $(document).on('change', '#selectAllLeads', function() {
+    const isChecked = this.checked;
+    $('.lead-select-checkbox').each(function() {
+      if (!this.disabled) {
+        this.checked = isChecked;
+      }
+    });
+    updateBulkActionsBar();
+  });
+
+  $(document).on('change', '.lead-select-checkbox', function() {
+    updateBulkActionsBar();
+    // Update select all checkbox state
+    const total = $('.lead-select-checkbox:not(:disabled)').length;
+    const checked = $('.lead-select-checkbox:checked').length;
+    $('#selectAllLeads').prop('checked', total === checked && total > 0);
+  });
+
+  // Handle DataTables draw event to reset/refresh selection states
+  if ($.fn.DataTable) {
+    $('table.datatable').on('draw.dt', function() {
+      const total = $('.lead-select-checkbox:not(:disabled)').length;
+      const checked = $('.lead-select-checkbox:checked').length;
+      $('#selectAllLeads').prop('checked', total === checked && total > 0);
+      updateBulkActionsBar();
+    });
+  }
+
+  // Single delete via event delegation
+  $(document).on('click', '.btn-delete-lead', function() {
+    const id = $(this).data('id');
+    const name = $(this).data('name');
+    if (confirm(`Are you sure you want to delete the lead "${name}"? This action cannot be undone.`)) {
+      document.getElementById('singleDeleteId').value = id;
+      document.getElementById('singleDeleteForm').submit();
+    }
+  });
+  <?php endif; ?>
+});
 </script>
+
+<?php if ($isAdmin): ?>
+<form id="singleDeleteForm" method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-none">
+  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="id" id="singleDeleteId" value="0">
+</form>
+<?php endif; ?>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('invoices');
 
 $db = getDB();
@@ -35,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $termsConditions = !empty($termsRaw) ? json_encode(array_values($termsRaw)) : null;
     $advanceAmount = max(0, (float)($_POST['advance_amount'] ?? 0));
     $advanceDate   = !empty($_POST['advance_date']) ? $_POST['advance_date'] : null;
+    $currency      = isset(CURRENCIES[$_POST['currency'] ?? '']) ? $_POST['currency'] : ($inv['currency'] ?? 'INR');
 
     $itemNames  = $_POST['item_name'] ?? [];
     $itemDescs  = $_POST['item_desc'] ?? [];
@@ -82,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newStatus = 'pending';
     }
 
-    $db->prepare("UPDATE invoices SET client_id=?,renewal_id=?,invoice_date=?,due_date=?,subtotal=?,discount_type=?,discount_percent=?,discount_amount=?,tax_percent=?,tax_amount=?,total_amount=?,advance_amount=?,advance_date=?,status=?,notes=?,terms_conditions=? WHERE id=?")
-       ->execute([$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$newStatus,$notes,$termsConditions,$id]);
+    $db->prepare("UPDATE invoices SET client_id=?,renewal_id=?,invoice_date=?,due_date=?,subtotal=?,discount_type=?,discount_percent=?,discount_amount=?,tax_percent=?,tax_amount=?,total_amount=?,advance_amount=?,advance_date=?,status=?,notes=?,terms_conditions=?,currency=? WHERE id=?")
+       ->execute([$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$newStatus,$notes,$termsConditions,$currency,$id]);
 
     $db->prepare("DELETE FROM invoice_items WHERE invoice_id=?")->execute([$id]);
     $itemStmt = $db->prepare("INSERT INTO invoice_items (invoice_id,item_name,description,quantity,unit_price,amount) VALUES (?,?,?,?,?,?)");
@@ -150,6 +152,16 @@ include __DIR__ . '/../../includes/header.php';
               <label class="form-label">Due Date *</label>
               <input type="date" name="due_date" class="form-control" value="<?= htmlspecialchars($inv['due_date']) ?>" required>
             </div>
+            <div class="col-md-6">
+              <label class="form-label">Currency</label>
+              <select name="currency" id="currencySelect" class="form-select">
+                <?php foreach (CURRENCIES as $code => $info): ?>
+                <option value="<?= $code ?>" <?= ($inv['currency'] ?? 'INR') === $code ? 'selected' : '' ?>>
+                  <?= $code ?> &mdash; <?= htmlspecialchars($info['name']) ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
           </div>
 
           <!-- Line Items -->
@@ -168,8 +180,8 @@ include __DIR__ . '/../../includes/header.php';
                     <th style="width:22%">Item</th>
                     <th style="width:28%">Description</th>
                     <th style="width:12%">Qty</th>
-                    <th style="width:17%">Unit Price (₹)</th>
-                    <th style="width:13%">Amount (₹)</th>
+                    <th style="width:17%" class="text-end">Unit Price</th>
+                    <th style="width:13%" class="text-end">Amount</th>
                     <th style="width:4%"></th>
                   </tr>
                 </thead>
@@ -311,11 +323,19 @@ function renumberRows() {
 function calcRow(row) {
   const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
   const price = parseFloat(row.querySelector('.item-price').value) || 0;
-  row.querySelector('.item-amount').value = '₹' + (qty * price).toFixed(2);
+  row.querySelector('.item-amount').value = (qty * price).toFixed(2);
   calcTotals();
 }
 
+function getCurrencySymbol() {
+  const sel = document.getElementById('currencySelect');
+  if (!sel) return '₹';
+  const symbols = <?= json_encode(array_map(fn($c) => $c['symbol'], CURRENCIES)) ?>;
+  return symbols[sel.value] || sel.value;
+}
+
 function calcTotals() {
+  const sym = getCurrencySymbol();
   let subtotal = 0;
   document.querySelectorAll('#itemsBody .item-row').forEach(row => {
     subtotal += (parseFloat(row.querySelector('.item-qty').value) || 0) * (parseFloat(row.querySelector('.item-price').value) || 0);
@@ -331,13 +351,17 @@ function calcTotals() {
   const advance = parseFloat(document.getElementById('invAdvance').value) || 0;
   const balance = Math.max(0, total - advance);
 
-  document.getElementById('dispSubtotal').textContent = '₹' + subtotal.toFixed(2);
-  document.getElementById('dispDiscount').textContent = '-₹' + discAmt.toFixed(2);
-  document.getElementById('dispAfterDiscount').textContent = '₹' + afterDisc.toFixed(2);
-  document.getElementById('dispTax').textContent = '₹' + taxAmt.toFixed(2);
-  document.getElementById('dispTotal').textContent = '₹' + total.toFixed(2);
-  document.getElementById('dispAdvance').textContent = '₹' + advance.toFixed(2);
-  document.getElementById('dispBalance').textContent = '₹' + balance.toFixed(2);
+  document.getElementById('dispSubtotal').textContent = sym + subtotal.toFixed(2);
+  document.getElementById('dispDiscount').textContent = '-' + sym + discAmt.toFixed(2);
+  document.getElementById('dispAfterDiscount').textContent = sym + afterDisc.toFixed(2);
+  document.getElementById('dispTax').textContent = sym + taxAmt.toFixed(2);
+  document.getElementById('dispTotal').textContent = sym + total.toFixed(2);
+  document.getElementById('dispAdvance').textContent = sym + advance.toFixed(2);
+  document.getElementById('dispBalance').textContent = sym + balance.toFixed(2);
+  if (discType === 'fixed') {
+    document.getElementById('discTypeToggle').textContent = sym;
+    document.getElementById('discSymbol').textContent = sym;
+  }
 }
 
 function addRow(name = '', desc = '', qty = 1, price = '') {
@@ -384,10 +408,11 @@ document.getElementById('invAdvance').addEventListener('input', calcTotals);
 document.getElementById('discTypeToggle').addEventListener('click', function() {
   const hidden = document.getElementById('discTypeHidden');
   const symbol = document.getElementById('discSymbol');
+  const sym = getCurrencySymbol();
   if (hidden.value === 'percent') {
     hidden.value = 'fixed';
-    this.textContent = '₹';
-    symbol.textContent = '₹';
+    this.textContent = sym;
+    symbol.textContent = sym;
     document.getElementById('invDiscount').removeAttribute('max');
   } else {
     hidden.value = 'percent';
@@ -397,6 +422,8 @@ document.getElementById('discTypeToggle').addEventListener('click', function() {
   }
   calcTotals();
 });
+
+document.getElementById('currencySelect').addEventListener('change', calcTotals);
 
 document.getElementById('invClient').addEventListener('change', function() {
   const clientId = this.value;

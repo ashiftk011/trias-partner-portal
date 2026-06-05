@@ -12,6 +12,9 @@ $stmt->execute([$id]);
 $lead = $stmt->fetch();
 if (!$lead) { redirect(BASE_URL . '/modules/leads/index.php'); }
 
+$isAdmin = isRole('admin');
+$canDelete = $isAdmin && $lead['status'] === 'not_interested';
+
 // If converted, find the linked client
 $linkedClient = null;
 if ($lead['status'] === 'converted') {
@@ -78,6 +81,15 @@ include __DIR__ . '/../../includes/header.php';
   </a>
   <?php endif; ?>
   <span class="badge bg-success fs-6 p-2"><i class="bi bi-check-circle me-1"></i>Converted</span>
+  <?php endif; ?>
+  <?php if ($canDelete): ?>
+  <form method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this lead? This action cannot be undone.')">
+    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+    <input type="hidden" name="id" value="<?= $id ?>">
+    <button type="submit" class="btn btn-danger">
+      <i class="bi bi-trash me-1"></i>Delete Lead
+    </button>
+  </form>
   <?php endif; ?>
 </div>
 

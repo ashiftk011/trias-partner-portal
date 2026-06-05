@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('quotations');
 
 $db = getDB();
@@ -58,7 +59,10 @@ function numberToWords($num) {
     return trim($words);
 }
 
-$amountInWords = numberToWords($inv['total_amount']) . ' Rupees Only';
+$currencyCode   = $inv['currency'] ?? 'INR';
+$currencySym    = currencySymbol($currencyCode);
+$currencyNameWd = currencyName($currencyCode);
+$amountInWords  = numberToWords($inv['total_amount']) . ' ' . $currencyNameWd . ' Only';
 
 $pageTitle = 'Quotation ' . $inv['quotation_no'];
 include __DIR__ . '/../../includes/header.php';
@@ -79,6 +83,16 @@ include __DIR__ . '/../../includes/header.php';
     <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
       <i class="bi bi-printer me-1"></i>Print
     </button>
+    <?php if (!empty($inv['client_id']) && !in_array($inv['status'], ['rejected', 'expired']) && hasAccess('invoices')): ?>
+    <form method="POST" action="<?= BASE_URL ?>/modules/quotations/convert_to_invoice.php" class="d-inline"
+          onsubmit="return confirm('Convert quotation <?= htmlspecialchars($inv['quotation_no'], ENT_QUOTES) ?> to an invoice?\nThis will create a new invoice and mark this quotation as Accepted.')">
+      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+      <input type="hidden" name="quotation_id" value="<?= $id ?>">
+      <button type="submit" class="btn btn-success btn-sm">
+        <i class="bi bi-file-earmark-arrow-down me-1"></i>Convert to Invoice
+      </button>
+    </form>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -174,8 +188,8 @@ include __DIR__ . '/../../includes/header.php';
                     <?php endif; ?>
                   </td>
                   <td class="text-center"><?= $item['quantity'] != 1 ? number_format($item['quantity'], 2) : 1 ?></td>
-                  <td class="text-end">₹<?= number_format($item['unit_price'], 2) ?></td>
-                  <td class="text-end fw-bold">₹<?= number_format($item['amount'], 2) ?></td>
+                  <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($item['unit_price'], 2) ?></td>
+                  <td class="text-end fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($item['amount'], 2) ?></td>
                 </tr>
                 <?php endforeach; ?>
               <?php else: ?>
@@ -187,27 +201,27 @@ include __DIR__ . '/../../includes/header.php';
             <tfoot>
               <tr>
                 <td colspan="4" class="text-end text-muted">Subtotal:</td>
-                <td class="text-end text-muted">₹<?= number_format($inv['subtotal'], 2) ?></td>
+                <td class="text-end text-muted"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'], 2) ?></td>
               </tr>
               <?php if ($inv['tax_percent'] > 0): ?>
               <tr>
                 <td colspan="4" class="text-end">GST / Tax (<?= $inv['tax_percent'] ?>%):</td>
-                <td class="text-end">₹<?= number_format($inv['tax_amount'], 2) ?></td>
+                <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['tax_amount'], 2) ?></td>
               </tr>
               <?php endif; ?>
               <tr class="fw-bold">
                 <td colspan="4" class="text-end">Total Amount:</td>
-                <td class="text-end">₹<?= number_format($inv['subtotal'] + $inv['tax_amount'], 2) ?></td>
+                <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'] + $inv['tax_amount'], 2) ?></td>
               </tr>
               <?php if ($discountAmount > 0): ?>
               <tr>
                 <td colspan="4" class="text-end">Discount:</td>
-                <td class="text-end text-danger">-₹<?= number_format($discountAmount, 2) ?></td>
+                <td class="text-end text-danger">-<?= htmlspecialchars($currencySym) ?><?= number_format($discountAmount, 2) ?></td>
               </tr>
               <?php endif; ?>
               <tr class="inv-total-row" style="border-top-color: #6366f1;">
                 <td colspan="4" class="text-end"><strong>Net Payable</strong></td>
-                <td class="text-end"><strong style="color: #6366f1; font-size: 1.1rem;">₹<?= number_format($inv['total_amount'], 2) ?></strong></td>
+                <td class="text-end"><strong style="color: #6366f1; font-size: 1.1rem;"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['total_amount'], 2) ?></strong></td>
               </tr>
               <tr>
                 <td colspan="1"></td>
@@ -281,7 +295,6 @@ include __DIR__ . '/../../includes/header.php';
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 900px;
 }
 
 .inv-content {
@@ -481,8 +494,15 @@ include __DIR__ . '/../../includes/header.php';
   .main-content { margin-left: 0 !important; }
   body { background: white !important; }
   .card { box-shadow: none !important; border: none !important; }
-  .inv-content { padding: 10px 20px; }
-  .inv-body { min-height: 100vh; overflow: visible !important; }
+  .inv-content { padding: 10px 20px 60px 20px; }
+  .inv-body { overflow: visible !important; }
+  .inv-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
   .inv-watermark { opacity: 0.05 !important; }
   .inv-watermark img { max-width: 500px; max-height: 500px; }
 }

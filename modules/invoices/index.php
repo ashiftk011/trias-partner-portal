@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('invoices');
 
 $db = getDB();
@@ -160,9 +161,9 @@ include __DIR__ . '/../../includes/header.php';
             <td><span class="badge bg-primary small"><?= htmlspecialchars($inv['project_name'] ?? '') ?></span></td>
             <td class="small text-nowrap"><?= date('d M Y', strtotime($inv['invoice_date'])) ?></td>
             <td class="small text-nowrap <?= $inv['status']==='overdue'?'text-danger fw-bold':'' ?>"><?= date('d M Y', strtotime($inv['due_date'])) ?></td>
-            <td class="fw-semibold text-end text-nowrap">₹<?= number_format($inv['total_amount'],2) ?></td>
-            <td class="text-success fw-semibold text-end text-nowrap">₹<?= number_format($inv['paid_amount'],2) ?></td>
-            <td class="<?= $balance>0?'text-danger':'text-success' ?> fw-semibold text-end text-nowrap">₹<?= number_format($balance,2) ?></td>
+            <td class="fw-semibold text-end text-nowrap"><?= htmlspecialchars(currencySymbol($inv['currency'] ?? 'INR')) ?><?= number_format($inv['total_amount'],2) ?></td>
+            <td class="text-success fw-semibold text-end text-nowrap"><?= htmlspecialchars(currencySymbol($inv['currency'] ?? 'INR')) ?><?= number_format($inv['paid_amount'],2) ?></td>
+            <td class="<?= $balance>0?'text-danger':'text-success' ?> fw-semibold text-end text-nowrap"><?= htmlspecialchars(currencySymbol($inv['currency'] ?? 'INR')) ?><?= number_format($balance,2) ?></td>
             <td class="text-center"><?= statusBadge($inv['status']) ?></td>
             <td class="text-center">
               <div class="btn-group btn-group-sm">
@@ -172,6 +173,13 @@ include __DIR__ . '/../../includes/header.php';
                 <?php endif; ?>
                 <?php if (in_array($inv['status'],['pending','partial','overdue'])): ?>
                 <a href="<?= BASE_URL ?>/modules/invoices/payment.php?invoice_id=<?= $inv['id'] ?>" class="btn btn-outline-success" title="Add Payment"><i class="bi bi-cash-coin"></i></a>
+                <?php endif; ?>
+                <?php if (isRole('admin')): ?>
+                <form method="POST" action="<?= BASE_URL ?>/modules/invoices/delete.php" class="d-inline" onsubmit="return confirm('Delete invoice <?= htmlspecialchars($inv['invoice_no'], ENT_QUOTES) ?>? This will also remove all payments. This cannot be undone.')">
+                  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                  <input type="hidden" name="id" value="<?= $inv['id'] ?>">
+                  <button type="submit" class="btn btn-outline-danger" title="Delete Invoice"><i class="bi bi-trash"></i></button>
+                </form>
                 <?php endif; ?>
               </div>
             </td>

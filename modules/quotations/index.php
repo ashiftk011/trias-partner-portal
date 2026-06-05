@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('quotations');
 
 $db = getDB();
@@ -107,13 +108,21 @@ include __DIR__ . '/../../includes/header.php';
             <td><small><?= htmlspecialchars($q['contact_name'] ?? '-') ?></small></td>
             <td><span class="badge bg-primary"><?= htmlspecialchars($q['project_name'] ?? '') ?></span></td>
             <td><small class="<?= $isExpired ? 'text-danger' : 'text-muted' ?>"><?= $q['valid_until'] ? date('d M Y', strtotime($q['valid_until'])) : '-' ?></small></td>
-            <td class="fw-semibold">₹<?= number_format($q['total_amount'], 2) ?><br><small class="text-muted"><?= number_format($q['tax_percent'],0) ?>% GST</small></td>
+            <td class="fw-semibold"><?= htmlspecialchars(currencySymbol($q['currency'] ?? 'INR')) ?><?= number_format($q['total_amount'], 2) ?><br><small class="text-muted"><?= number_format($q['tax_percent'],0) ?>% Tax</small></td>
             <td><span class="badge bg-<?= $sc ?>"><?= ucfirst($q['status']) ?></span></td>
             <td><small class="text-muted"><?= htmlspecialchars($q['created_by_name'] ?? '-') ?></small></td>
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="<?= BASE_URL ?>/modules/quotations/view.php?id=<?= $q['id'] ?>" class="btn btn-outline-info" title="View/Print"><i class="bi bi-printer"></i></a>
                 <a href="<?= BASE_URL ?>/modules/quotations/save.php?id=<?= $q['id'] ?>" class="btn btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <?php if (!empty($q['client_id']) && !in_array($q['status'], ['rejected','expired']) && hasAccess('invoices')): ?>
+                <form method="POST" action="<?= BASE_URL ?>/modules/quotations/convert_to_invoice.php" class="d-inline"
+                      onsubmit="return confirm('Convert <?= htmlspecialchars($q['quotation_no'], ENT_QUOTES) ?> to an invoice?')">
+                  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                  <input type="hidden" name="quotation_id" value="<?= $q['id'] ?>">
+                  <button type="submit" class="btn btn-outline-success" title="Convert to Invoice"><i class="bi bi-file-earmark-arrow-down"></i></button>
+                </form>
+                <?php endif; ?>
                 <?php if (isRole('admin')): ?>
                 <form method="POST" action="<?= BASE_URL ?>/modules/quotations/delete.php" class="d-inline" onsubmit="return confirm('Delete this quotation?')">
                   <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">

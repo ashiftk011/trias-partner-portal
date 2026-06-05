@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('invoices');
 
 $db = getDB();
@@ -55,7 +56,10 @@ function numberToWords($num) {
     return trim($words);
 }
 
-$amountInWords = numberToWords($inv['total_amount']) . ' Rupees Only';
+$currencyCode   = $inv['currency'] ?? 'INR';
+$currencySym    = currencySymbol($currencyCode);
+$currencyNameWd = currencyName($currencyCode);
+$amountInWords  = numberToWords($inv['total_amount']) . ' ' . $currencyNameWd . ' Only';
 
 $pageTitle = 'Invoice ' . $inv['invoice_no'];
 include __DIR__ . '/../../includes/header.php';
@@ -83,6 +87,16 @@ include __DIR__ . '/../../includes/header.php';
     <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
       <i class="bi bi-printer me-1"></i>Print
     </button>
+    <?php if (isRole('admin')): ?>
+    <form method="POST" action="<?= BASE_URL ?>/modules/invoices/delete.php" class="d-inline"
+          onsubmit="return confirm('Delete invoice <?= htmlspecialchars($inv['invoice_no'], ENT_QUOTES) ?>?\nThis will also remove all payments. This cannot be undone.')">
+      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+      <input type="hidden" name="id" value="<?= $id ?>">
+      <button type="submit" class="btn btn-danger btn-sm">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -152,7 +166,7 @@ include __DIR__ . '/../../includes/header.php';
           <div class="inv-info-cell">
             <div class="inv-info-label">Amount Due:</div>
             <?php $amountDue = max(0, $inv['total_amount'] - (float)($inv['advance_amount'] ?? 0) - $inv['paid_amount']); ?>
-            <div class="inv-info-value inv-amount-due">₹<?= number_format($amountDue, 0) ?></div>
+            <div class="inv-info-value inv-amount-due"><?= htmlspecialchars($currencySym) ?><?= number_format($amountDue, 0) ?></div>
           </div>
         </div>
 
@@ -177,8 +191,8 @@ include __DIR__ . '/../../includes/header.php';
                   <td class="fw-semibold"><?= htmlspecialchars($item['item_name'] ?: $item['description']) ?></td>
                   <td class="text-muted" style="font-size:.83rem"><?= htmlspecialchars($item['description'] ?? '') ?></td>
                   <td class="text-center"><?= $item['quantity'] != 1 ? number_format($item['quantity'], 0) : 1 ?></td>
-                  <td class="text-end">₹<?= number_format($item['unit_price'], 0) ?></td>
-                  <td class="text-end fw-bold">₹<?= number_format($item['amount'], 0) ?></td>
+                  <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($item['unit_price'], 0) ?></td>
+                  <td class="text-end fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($item['amount'], 0) ?></td>
                 </tr>
                 <?php endforeach; ?>
               <?php else: ?>
@@ -187,8 +201,8 @@ include __DIR__ . '/../../includes/header.php';
                   <td class="fw-semibold"><?= htmlspecialchars($inv['plan_name'] ?? 'Service Charges') ?></td>
                   <td class="text-muted" style="font-size:.83rem"><?= $inv['notes'] ? htmlspecialchars($inv['notes']) : '' ?></td>
                   <td class="text-center">1</td>
-                  <td class="text-end">₹<?= number_format($inv['subtotal'], 0) ?></td>
-                  <td class="text-end fw-bold">₹<?= number_format($inv['subtotal'], 0) ?></td>
+                  <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'], 0) ?></td>
+                  <td class="text-end fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'], 0) ?></td>
                 </tr>
               <?php endif; ?>
             </tbody>
@@ -203,18 +217,18 @@ include __DIR__ . '/../../includes/header.php';
                     (<?= $discountPercent ?>%):
                   <?php endif; ?>
                 </td>
-                <td class="text-end text-danger">-₹<?= number_format($discountAmount,0) ?></td>
+                <td class="text-end text-danger">-<?= htmlspecialchars($currencySym) ?><?= number_format($discountAmount,0) ?></td>
               </tr>
               <?php endif; ?>
               <?php if ($inv['tax_percent'] > 0): ?>
               <tr>
                 <td colspan="5" class="text-end">GST / Tax (<?= $inv['tax_percent'] ?>%):</td>
-                <td class="text-end">₹<?= number_format($inv['tax_amount'],0) ?></td>
+                <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['tax_amount'],0) ?></td>
               </tr>
               <?php endif; ?>
               <tr class="inv-total-row">
                 <td colspan="5" class="text-end"><strong>Total</strong></td>
-                <td class="text-end"><strong>₹<?= number_format($inv['total_amount'],0) ?></strong></td>
+                <td class="text-end"><strong><?= htmlspecialchars($currencySym) ?><?= number_format($inv['total_amount'],0) ?></strong></td>
               </tr>
               <tr>
                 <td colspan="1"></td>
@@ -232,25 +246,25 @@ include __DIR__ . '/../../includes/header.php';
                   <?php endif; ?>
                   :
                 </td>
-                <td class="text-end text-primary fw-bold">₹<?= number_format($advanceAmt,0) ?></td>
+                <td class="text-end text-primary fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($advanceAmt,0) ?></td>
               </tr>
               <?php endif; ?>
               <?php if ($inv['paid_amount'] > 0): ?>
               <tr>
                 <td colspan="5" class="text-end text-success">Amount Paid:</td>
-                <td class="text-end text-success fw-bold">₹<?= number_format($inv['paid_amount'],0) ?></td>
+                <td class="text-end text-success fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['paid_amount'],0) ?></td>
               </tr>
               <?php $balance = $inv['total_amount'] - $advanceAmt - $inv['paid_amount']; if ($balance > 0): ?>
               <tr>
                 <td colspan="5" class="text-end text-danger">Balance Due:</td>
-                <td class="text-end text-danger fw-bold">₹<?= number_format($balance,0) ?></td>
+                <td class="text-end text-danger fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($balance,0) ?></td>
               </tr>
               <?php endif; ?>
               <?php else: ?>
               <?php $balance = $inv['total_amount'] - $advanceAmt; if ($balance > 0 && $advanceAmt > 0): ?>
               <tr>
                 <td colspan="5" class="text-end text-danger">Balance Due:</td>
-                <td class="text-end text-danger fw-bold">₹<?= number_format($balance,0) ?></td>
+                <td class="text-end text-danger fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($balance,0) ?></td>
               </tr>
               <?php endif; ?>
               <?php endif; ?>
@@ -320,7 +334,7 @@ include __DIR__ . '/../../includes/header.php';
         <?php foreach ($payments as $py): ?>
         <div class="border-bottom p-3">
           <div class="d-flex justify-content-between align-items-start">
-            <span class="fw-semibold text-success">₹<?= number_format($py['amount'],2) ?></span>
+            <span class="fw-semibold text-success"><?= htmlspecialchars($currencySym) ?><?= number_format($py['amount'],2) ?></span>
             <div class="d-flex align-items-center gap-2">
               <small class="text-muted"><?= date('d M Y', strtotime($py['payment_date'])) ?></small>
               <a href="<?= BASE_URL ?>/modules/invoices/receipt.php?payment_id=<?= $py['id'] ?>" target="_blank" class="btn btn-xs btn-outline-success py-0 px-1" title="View Receipt" style="font-size:.7rem;line-height:1.6">
@@ -335,7 +349,7 @@ include __DIR__ . '/../../includes/header.php';
         <?php endforeach; ?>
         <div class="p-3 bg-light d-flex justify-content-between fw-semibold">
           <span>Total Paid:</span>
-          <span class="text-success">₹<?= number_format($inv['paid_amount'],2) ?></span>
+          <span class="text-success"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['paid_amount'],2) ?></span>
         </div>
         <?php else: ?>
         <div class="text-center text-muted py-4 small"><i class="bi bi-cash d-block fs-3 mb-2"></i>No payments recorded</div>

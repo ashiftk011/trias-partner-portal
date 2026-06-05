@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('quotations');
 
 $db   = getDB();
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tax_percent= (float)($_POST['tax_percent'] ?? 18);
     $status     = $_POST['status']  ?? 'draft';
     $notes      = trim($_POST['notes'] ?? '');
+    $currency   = isset(CURRENCIES[$_POST['currency'] ?? '']) ? $_POST['currency'] : 'INR';
 
     $descs       = $_POST['item_desc']       ?? [];
     $price_types = $_POST['item_price_type'] ?? [];
@@ -61,9 +63,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $db->prepare("UPDATE quotations SET title=?,project_id=?,lead_id=?,client_id=?,valid_until=?,
-            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=?,terms_conditions=? WHERE id=?")
+            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=?,terms_conditions=?,currency=? WHERE id=?")
            ->execute([$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$id]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$id]);
         $db->prepare("DELETE FROM quotation_items WHERE quotation_id=?")->execute([$id]);
         setFlash('success','Quotation updated.');
     } else {
@@ -71,10 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $num  = $last && preg_match('/QTN-(\d+)/', $last, $m) ? (int)$m[1]+1 : 1;
         $no   = 'QTN-'.str_pad($num, 4, '0', STR_PAD_LEFT);
         $db->prepare("INSERT INTO quotations (quotation_no,title,project_id,lead_id,client_id,valid_until,
-            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,terms_conditions,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,terms_conditions,currency,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
            ->execute([$no,$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$user['id']]);
+                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$user['id']]);
         $id = (int)$db->lastInsertId();
         setFlash('success',"Quotation $no created.");
     }
@@ -90,7 +92,7 @@ $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetch
 $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
 
 $q = $quotation ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','valid_until'=>'',
-     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null];
+     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null,'currency'=>'INR'];
 
 $pageTitle = $id ? 'Edit Quotation' : 'New Quotation';
 include __DIR__ . '/../../includes/header.php';
@@ -128,11 +130,21 @@ include __DIR__ . '/../../includes/header.php';
                 <?php endforeach; ?>
               </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Currency</label>
+              <select name="currency" id="currencySelect" class="form-select">
+                <?php foreach (CURRENCIES as $code => $info): ?>
+                <option value="<?= $code ?>" <?= ($q['currency'] ?? 'INR') === $code ? 'selected' : '' ?>>
+                  <?= $code ?> — <?= htmlspecialchars($info['name']) ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-md-3">
               <label class="form-label small fw-semibold">Valid Until</label>
               <input type="date" name="valid_until" class="form-control" value="<?= htmlspecialchars($q['valid_until'] ?? '') ?>">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label small fw-semibold">Status</label>
               <select name="status" class="form-select">
                 <option value="draft"    <?= $q['status']==='draft'   ?'selected':'' ?>>Draft</option>
@@ -209,7 +221,7 @@ include __DIR__ . '/../../includes/header.php';
             <span class="fw-semibold" id="subtotalDisplay">₹0.00</span>
           </div>
           <div class="row g-2 align-items-center mb-2">
-            <div class="col-6"><label class="form-label small fw-semibold mb-0">GST %</label></div>
+            <div class="col-6"><label class="form-label small fw-semibold mb-0">Tax / VAT %</label></div>
             <div class="col-6 text-end">
               <input type="number" name="tax_percent" id="taxInput" class="form-control form-control-sm text-end" value="<?= $q['tax_percent'] ?>" step="0.01" min="0" max="100">
             </div>
@@ -223,7 +235,7 @@ include __DIR__ . '/../../includes/header.php';
             <span class="fw-semibold" id="totalAmountDisplay">₹0.00</span>
           </div>
           <div class="row g-2 align-items-center mb-3">
-            <div class="col-6"><label class="form-label small fw-semibold mb-0">Discount (₹)</label></div>
+            <div class="col-6"><label class="form-label small fw-semibold mb-0" id="discountLabel">Discount</label></div>
             <div class="col-6 text-end">
               <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end" value="<?= $q['discount'] ?>" step="0.01" min="0">
             </div>
@@ -286,7 +298,15 @@ function calcRow(row) {
   recalcTotals();
 }
 
+function getCurrencySymbol() {
+  const sel = document.getElementById('currencySelect');
+  if (!sel) return '₹';
+  const symbols = <?= json_encode(array_map(fn($c) => $c['symbol'], CURRENCIES)) ?>;
+  return symbols[sel.value] || sel.value;
+}
+
 function recalcTotals() {
+  const sym = getCurrencySymbol();
   let sub = 0;
   document.querySelectorAll('.item-amount').forEach(el => sub += parseFloat(el.value) || 0);
   const taxPct  = parseFloat(document.getElementById('taxInput').value) || 0;
@@ -296,10 +316,11 @@ function recalcTotals() {
   const totalAmount = sub + taxAmt;
   const netPayable  = Math.max(0, totalAmount - discount);
 
-  document.getElementById('subtotalDisplay').textContent    = '₹' + sub.toFixed(2);
-  document.getElementById('taxDisplay').textContent         = '₹' + taxAmt.toFixed(2);
-  document.getElementById('totalAmountDisplay').textContent = '₹' + totalAmount.toFixed(2);
-  document.getElementById('netPayableDisplay').textContent  = '₹' + netPayable.toFixed(2);
+  document.getElementById('subtotalDisplay').textContent    = sym + sub.toFixed(2);
+  document.getElementById('taxDisplay').textContent         = sym + taxAmt.toFixed(2);
+  document.getElementById('totalAmountDisplay').textContent = sym + totalAmount.toFixed(2);
+  document.getElementById('netPayableDisplay').textContent  = sym + netPayable.toFixed(2);
+  document.getElementById('discountLabel').textContent      = 'Discount (' + sym + ')';
 }
 
 function addRow() {
@@ -361,6 +382,8 @@ document.querySelectorAll('#termsList .remove-term').forEach(btn => {
 });
 
 // Load Default Project Terms
+document.getElementById('currencySelect').addEventListener('change', recalcTotals);
+
 document.getElementById('quotationProject').addEventListener('change', function() {
   const projectId = this.value;
   if (!projectId) return;
