@@ -50,7 +50,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Update lead status if changed
         if ($statusUpd) {
-            $db->prepare("UPDATE leads SET status=?,updated_at=NOW() WHERE id=?")->execute([$statusUpd,$id]);
+            if ($statusUpd === 'trial' || $statusUpd === 'trial_ended') {
+                $trialEndDate  = !empty($_POST['trial_end_date']) ? $_POST['trial_end_date'] : null;
+                $trialLoginUrl = !empty($_POST['trial_login_url']) ? trim($_POST['trial_login_url']) : null;
+                $trialUsername = !empty($_POST['trial_username']) ? trim($_POST['trial_username']) : null;
+                $trialPassword = !empty($_POST['trial_password']) ? trim($_POST['trial_password']) : null;
+
+                $db->prepare("UPDATE leads SET status=?, trial_end_date=?, trial_login_url=?, trial_username=?, trial_password=?, updated_at=NOW() WHERE id=?")
+                   ->execute([$statusUpd, $trialEndDate, $trialLoginUrl, $trialUsername, $trialPassword, $id]);
+            } else {
+                $db->prepare("UPDATE leads SET status=?, trial_end_date=NULL, trial_login_url=NULL, trial_username=NULL, trial_password=NULL, updated_at=NOW() WHERE id=?")
+                   ->execute([$statusUpd, $id]);
+            }
         } elseif ($followup) {
             $db->prepare("UPDATE leads SET status='follow_up',updated_at=NOW() WHERE id=?")->execute([$id]);
         }
@@ -125,6 +136,72 @@ include __DIR__ . '/../../includes/header.php';
         <?php endif; ?>
       </div>
     </div>
+
+    <?php if ($lead['status'] === 'trial' || $lead['status'] === 'trial_ended'): ?>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2 text-primary"></i>Trial Information</span>
+        <?php
+        if ($lead['status'] === 'trial' && $lead['trial_end_date']) {
+            $daysLeft = (int)ceil((strtotime($lead['trial_end_date']) - time()) / 86400);
+            if ($daysLeft > 0) {
+                echo "<span class='badge bg-success'>{$daysLeft} days left</span>";
+            } elseif ($daysLeft === 0) {
+                echo "<span class='badge bg-warning text-dark'>Expires today</span>";
+            } else {
+                echo "<span class='badge bg-danger'>Expired</span>";
+            }
+        } else {
+            echo "<span class='badge bg-secondary'>Expired</span>";
+        }
+        ?>
+      </div>
+      <div class="card-body">
+        <?php if ($lead['trial_end_date']): ?>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">End Date</span>
+          <span class="fw-semibold small"><?= date('d M Y', strtotime($lead['trial_end_date'])) ?></span>
+        </div>
+        <?php endif; ?>
+        
+        <?php if ($lead['trial_login_url']): ?>
+        <div class="d-flex justify-content-between border-bottom py-2 align-items-center">
+          <span class="text-muted small">Login URL</span>
+          <a href="<?= htmlspecialchars($lead['trial_login_url']) ?>" target="_blank" class="btn btn-xs btn-outline-primary py-0 px-2 small text-decoration-none">
+            Open Link <i class="bi bi-box-arrow-up-right ms-1"></i>
+          </a>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($lead['trial_username']): ?>
+        <div class="d-flex justify-content-between border-bottom py-2 align-items-center">
+          <span class="text-muted small">Username</span>
+          <span class="fw-semibold small d-flex align-items-center gap-1">
+            <span id="trialUserText"><?= htmlspecialchars($lead['trial_username']) ?></span>
+            <button class="btn btn-link p-0 text-muted" onclick="copyText('trialUserText')" title="Copy Username">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </span>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($lead['trial_password']): ?>
+        <div class="d-flex justify-content-between border-bottom py-2 align-items-center">
+          <span class="text-muted small">Password</span>
+          <span class="fw-semibold small d-flex align-items-center gap-2">
+            <span id="trialPassText" data-raw="<?= htmlspecialchars($lead['trial_password']) ?>" data-masked="••••••••">••••••••</span>
+            <button class="btn btn-link p-0 text-muted" id="togglePassBtn" onclick="togglePassword()" title="Show/Hide Password">
+              <i class="bi bi-eye"></i>
+            </button>
+            <button class="btn btn-link p-0 text-muted" onclick="copyPassword()" title="Copy Password">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </span>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- Responses + Feed Response -->
@@ -153,6 +230,8 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="">-- No Change --</option>
                 <option value="contacted">Contacted</option>
                 <option value="interested">Interested</option>
+                <option value="trial">Trial</option>
+                <option value="trial_ended">Trial Ended</option>
                 <option value="not_interested">Not Interested</option>
                 <option value="follow_up">Follow Up</option>
                 <option value="converted">Converted</option>
@@ -162,6 +241,36 @@ include __DIR__ . '/../../includes/header.php';
               <label class="form-label">Next Follow-up Date</label>
               <input type="date" name="next_followup" class="form-control" min="<?= date('Y-m-d') ?>">
             </div>
+            
+            <!-- Feed Response Trial Fields Section -->
+            <div class="col-12" id="feedTrialFields" style="display: none;">
+              <div class="card border-0 bg-light shadow-sm">
+                <div class="card-header bg-white border-bottom-0 py-3 fw-semibold">
+                  <i class="bi bi-clock-history text-primary me-2"></i>Trial Version Settings
+                </div>
+                <div class="card-body pt-0">
+                  <div class="row g-3">
+                    <div class="col-md-3">
+                      <label class="form-label">Trial End Date *</label>
+                      <input type="date" name="trial_end_date" id="feedTrialEndDate" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Login URL</label>
+                      <input type="url" name="trial_login_url" id="feedTrialLoginUrl" class="form-control" placeholder="https://example.com/login">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Username</label>
+                      <input type="text" name="trial_username" id="feedTrialUsername" class="form-control" placeholder="Username">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Password</label>
+                      <input type="text" name="trial_password" id="feedTrialPassword" class="form-control" placeholder="Password">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="col-12">
               <label class="form-label">Response / Notes *</label>
               <textarea name="response" class="form-control" rows="3" required placeholder="Describe what happened in this interaction..."></textarea>
@@ -211,5 +320,56 @@ include __DIR__ . '/../../includes/header.php';
     </div>
   </div>
 </div>
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  $('#statusUpdateSelect').on('change', function() {
+    const status = this.value;
+    const trialDiv = document.getElementById('feedTrialFields');
+    if (status === 'trial' || status === 'trial_ended') {
+      $(trialDiv).slideDown();
+      document.getElementById('feedTrialEndDate').required = true;
+    } else {
+      $(trialDiv).slideUp();
+      document.getElementById('feedTrialEndDate').required = false;
+    }
+  });
+});
+
+function copyText(elementId) {
+  const text = document.getElementById(elementId).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Copied to clipboard!');
+  }).catch(err => {
+    console.error('Failed to copy text: ', err);
+  });
+}
+
+function copyPassword() {
+  const passSpan = document.getElementById('trialPassText');
+  const rawPass = passSpan.getAttribute('data-raw');
+  navigator.clipboard.writeText(rawPass).then(() => {
+    alert('Password copied to clipboard!');
+  }).catch(err => {
+    console.error('Failed to copy password: ', err);
+  });
+}
+
+function togglePassword() {
+  const passSpan = document.getElementById('trialPassText');
+  const btnIcon = document.querySelector('#togglePassBtn i');
+  const current = passSpan.innerText;
+  const raw = passSpan.getAttribute('data-raw');
+  const masked = passSpan.getAttribute('data-masked');
+  
+  if (current === masked) {
+    passSpan.innerText = raw;
+    btnIcon.classList.replace('bi-eye', 'bi-eye-slash');
+  } else {
+    passSpan.innerText = masked;
+    btnIcon.classList.replace('bi-eye-slash', 'bi-eye');
+  }
+}
+</script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>

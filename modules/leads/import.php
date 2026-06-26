@@ -57,7 +57,7 @@ $errors   = [];
 $rowNum   = 1;
 
 $validSources  = ['website','referral','social_media','cold_call','email','exhibition','other'];
-$validStatuses = ['new','contacted','interested','not_interested','follow_up'];
+$validStatuses = ['new','contacted','interested','not_interested','follow_up','trial','trial_ended'];
 
 while (($row = fgetcsv($handle)) !== false) {
     $rowNum++;

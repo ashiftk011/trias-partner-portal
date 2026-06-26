@@ -39,7 +39,8 @@ foreach ($db->query("SELECT setting_key, setting_value FROM app_settings")->fetc
     $companySettings[$row['setting_key']] = $row['setting_value'];
 }
 
-$discountAmount = $inv['discount'] ?? 0;
+$discountAmount = (float)($inv['discount'] ?? 0);
+$discountType   = $inv['discount_type'] ?? 'after_gst';
 
 // Amount in words helper
 function numberToWords($num) {
@@ -203,6 +204,16 @@ include __DIR__ . '/../../includes/header.php';
                 <td colspan="4" class="text-end text-muted">Subtotal:</td>
                 <td class="text-end text-muted"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'], 2) ?></td>
               </tr>
+              <?php if ($discountType === 'before_gst' && $discountAmount > 0): ?>
+              <tr>
+                <td colspan="4" class="text-end">Discount (Before GST):</td>
+                <td class="text-end text-danger">-<?= htmlspecialchars($currencySym) ?><?= number_format($discountAmount, 2) ?></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="text-end text-muted">Taxable Amount:</td>
+                <td class="text-end text-muted"><?= htmlspecialchars($currencySym) ?><?= number_format(max(0, $inv['subtotal'] - $discountAmount), 2) ?></td>
+              </tr>
+              <?php endif; ?>
               <?php if ($inv['tax_percent'] > 0): ?>
               <tr>
                 <td colspan="4" class="text-end">GST / Tax (<?= $inv['tax_percent'] ?>%):</td>
@@ -210,12 +221,12 @@ include __DIR__ . '/../../includes/header.php';
               </tr>
               <?php endif; ?>
               <tr class="fw-bold">
-                <td colspan="4" class="text-end">Total Amount:</td>
+                <td colspan="4" class="text-end">Total (incl. GST):</td>
                 <td class="text-end"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['subtotal'] + $inv['tax_amount'], 2) ?></td>
               </tr>
-              <?php if ($discountAmount > 0): ?>
+              <?php if ($discountType === 'after_gst' && $discountAmount > 0): ?>
               <tr>
-                <td colspan="4" class="text-end">Discount:</td>
+                <td colspan="4" class="text-end">Discount (After GST):</td>
                 <td class="text-end text-danger">-<?= htmlspecialchars($currencySym) ?><?= number_format($discountAmount, 2) ?></td>
               </tr>
               <?php endif; ?>

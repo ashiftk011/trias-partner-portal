@@ -159,6 +159,8 @@ function statusBadge(string $status): string {
         'not_interested'=> 'danger',
         'follow_up'     => 'warning',
         'converted'     => 'success',
+        'trial'         => 'info',
+        'trial_ended'   => 'secondary',
         'pending'       => 'warning',
         'paid'          => 'success',
         'partial'       => 'info',
@@ -168,6 +170,6 @@ function statusBadge(string $status): string {
         'suspended'     => 'danger',
     ];
     $cls = $map[$status] ?? 'secondary';
-    $label = ucfirst(str_replace('_', ' ', $status));
+    $label = ucwords(str_replace('_', ' ', $status));
     return "<span class='badge bg-{$cls}'>{$label}</span>";
 }

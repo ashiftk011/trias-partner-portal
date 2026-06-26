@@ -105,10 +105,19 @@ include __DIR__ . '/../../includes/header.php';
 <!-- Status Summary Pills -->
 <div class="d-flex flex-wrap gap-2 mb-3">
   <?php
-  $statusColors = ['new'=>'primary','contacted'=>'info','interested'=>'warning','not_interested'=>'danger','follow_up'=>'secondary','converted'=>'success'];
+  $statusColors = [
+    'new'            => 'primary',
+    'contacted'      => 'info',
+    'interested'     => 'warning',
+    'trial'          => 'info',
+    'trial_ended'    => 'danger',
+    'not_interested' => 'danger',
+    'follow_up'      => 'secondary',
+    'converted'      => 'success'
+  ];
   foreach ($statusColors as $st => $cls): ?>
   <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?>" class="badge bg-<?= $cls ?> text-decoration-none p-2 fs-6">
-    <?= ucfirst(str_replace('_',' ',$st)) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
+    <?= ucwords(str_replace('_',' ',$st)) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
   <?php if ($filterStatus || $filterProject || $filterRegion || $filterSearch): ?>
@@ -153,7 +162,7 @@ include __DIR__ . '/../../includes/header.php';
         <select name="status" class="form-select form-select-sm">
           <option value="">All Statuses</option>
           <?php foreach (array_keys($statusColors) as $st): ?>
-          <option value="<?= $st ?>" <?= $filterStatus===$st?'selected':'' ?>><?= ucfirst(str_replace('_',' ',$st)) ?></option>
+          <option value="<?= $st ?>" <?= $filterStatus===$st?'selected':'' ?>><?= ucwords(str_replace('_',' ',$st)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -323,6 +332,8 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="new">New</option>
                 <option value="contacted">Contacted</option>
                 <option value="interested">Interested</option>
+                <option value="trial">Trial</option>
+                <option value="trial_ended">Trial Ended</option>
                 <option value="not_interested">Not Interested</option>
                 <option value="follow_up">Follow Up</option>
               </select>
@@ -346,6 +357,36 @@ include __DIR__ . '/../../includes/header.php';
               <label class="form-label">Website</label>
               <input type="url" name="website" id="lWebsite" class="form-control" placeholder="https://example.com">
             </div>
+            
+            <!-- Trial Settings Section -->
+            <div class="col-12" id="lTrialFields" style="display: none;">
+              <div class="card border-0 bg-light shadow-sm">
+                <div class="card-header bg-white border-bottom-0 py-3 fw-semibold">
+                  <i class="bi bi-clock-history text-primary me-2"></i>Trial Version Settings
+                </div>
+                <div class="card-body pt-0">
+                  <div class="row g-3">
+                    <div class="col-md-3">
+                      <label class="form-label">Trial End Date *</label>
+                      <input type="date" name="trial_end_date" id="lTrialEndDate" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Login URL</label>
+                      <input type="url" name="trial_login_url" id="lTrialLoginUrl" class="form-control" placeholder="https://example.com/login">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Username</label>
+                      <input type="text" name="trial_username" id="lTrialUsername" class="form-control" placeholder="Username">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">Trial Password</label>
+                      <input type="text" name="trial_password" id="lTrialPassword" class="form-control" placeholder="Password">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="col-12">
               <label class="form-label">Address</label>
               <textarea name="address" id="lAddress" class="form-control" rows="2" placeholder="Street, City, State, Pincode"></textarea>
@@ -420,10 +461,18 @@ function editLead(l) {
   document.getElementById('lSource').value        = l.source;
   document.getElementById('lStatus').value        = l.status;
   document.getElementById('lNotes').value         = l.notes || '';
+  document.getElementById('lTrialEndDate').value   = l.trial_end_date || '';
+  document.getElementById('lTrialLoginUrl').value  = l.trial_login_url || '';
+  document.getElementById('lTrialUsername').value  = l.trial_username || '';
+  document.getElementById('lTrialPassword').value  = l.trial_password || '';
+  
   $('#lProject').val(l.project_id).trigger('change');
   $('#lRegion').val(l.region_id || '').trigger('change');
   $('#lAssigned').val(l.assigned_to || '').trigger('change');
   loadPlans(l.project_id, l.interested_plan_id);
+  
+  $('#lStatus').trigger('change');
+  
   document.getElementById('leadModalTitle').textContent = 'Edit Lead';
   new bootstrap.Modal(document.getElementById('leadModal')).show();
 }
@@ -467,6 +516,45 @@ function confirmBulkDelete() {
 <?php endif; ?>
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Handle status selection change
+  $('#lStatus').on('change', function() {
+    const status = this.value;
+    const trialDiv = document.getElementById('lTrialFields');
+    if (status === 'trial' || status === 'trial_ended') {
+      $(trialDiv).slideDown();
+      document.getElementById('lTrialEndDate').required = true;
+    } else {
+      $(trialDiv).slideUp();
+      document.getElementById('lTrialEndDate').required = false;
+    }
+  });
+
+  // Reset modal on add lead action
+  $('#leadModal').on('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    if (button && button.getAttribute('data-bs-target') === '#leadModal') {
+      document.getElementById('leadId').value = '0';
+      document.getElementById('lName').value = '';
+      document.getElementById('lPhone').value = '';
+      document.getElementById('lEmail').value = '';
+      document.getElementById('lCompany').value = '';
+      document.getElementById('lDesignation').value = '';
+      document.getElementById('lWebsite').value = '';
+      document.getElementById('lAddress').value = '';
+      document.getElementById('lNotes').value = '';
+      document.getElementById('lStatus').value = 'new';
+      document.getElementById('lTrialEndDate').value = '';
+      document.getElementById('lTrialLoginUrl').value = '';
+      document.getElementById('lTrialUsername').value = '';
+      document.getElementById('lTrialPassword').value = '';
+      $('#lProject').val('').trigger('change');
+      $('#lRegion').val('').trigger('change');
+      $('#lAssigned').val('').trigger('change');
+      document.getElementById('leadModalTitle').textContent = 'Add Lead';
+      $('#lStatus').trigger('change');
+    }
+  });
+
   $('#lProject').on('change', function() { loadPlans(this.value); });
 
   <?php if ($isAdmin): ?>

@@ -56,10 +56,9 @@ try {
 
     // Map quotation financials to invoice
     $subtotal        = (float)$q['subtotal'];
+    $discountType    = $q['discount_type'] ?? 'after_gst';
     $discountAmount  = (float)($q['discount'] ?? 0);
     $discountPercent = $subtotal > 0 ? round($discountAmount / $subtotal * 100, 4) : 0;
-    $discountType    = 'fixed';
-    $afterDiscount   = $subtotal - $discountAmount;
     $taxPercent      = (float)$q['tax_percent'];
     $taxAmount       = (float)$q['tax_amount'];
     $totalAmount     = (float)$q['total_amount'];

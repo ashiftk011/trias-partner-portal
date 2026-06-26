@@ -27,10 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lead_id    = $_POST['lead_id']   ? (int)$_POST['lead_id']   : null;
     $client_id  = $_POST['client_id'] ? (int)$_POST['client_id'] : null;
     $valid_until= $_POST['valid_until'] ?: null;
-    $tax_percent= (float)($_POST['tax_percent'] ?? 18);
-    $status     = $_POST['status']  ?? 'draft';
-    $notes      = trim($_POST['notes'] ?? '');
-    $currency   = isset(CURRENCIES[$_POST['currency'] ?? '']) ? $_POST['currency'] : 'INR';
+    $tax_percent   = (float)($_POST['tax_percent'] ?? 18);
+    $status        = $_POST['status']  ?? 'draft';
+    $notes         = trim($_POST['notes'] ?? '');
+    $currency      = isset(CURRENCIES[$_POST['currency'] ?? '']) ? $_POST['currency'] : 'INR';
+    $discount_type = in_array($_POST['discount_type'] ?? '', ['before_gst','after_gst']) ? $_POST['discount_type'] : 'after_gst';
 
     $descs       = $_POST['item_desc']       ?? [];
     $price_types = $_POST['item_price_type'] ?? [];
@@ -48,10 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subtotal += $amt;
         $lineItems[] = ['desc'=>trim($desc),'price_type'=>$ptype,'qty'=>$qty,'price'=>$price,'amount'=>$amt];
     }
-    $taxAmt      = round($subtotal * $tax_percent / 100, 2);
-    $totalAmount = $subtotal + $taxAmt;
-    $discount    = (float)($_POST['discount'] ?? 0);
-    $netPayable  = max(0, $totalAmount - $discount);
+    $discount = (float)($_POST['discount'] ?? 0);
+
+    if ($discount_type === 'before_gst') {
+        // Discount applied on subtotal, GST calculated on discounted base
+        $discountedBase = max(0, $subtotal - $discount);
+        $taxAmt         = round($discountedBase * $tax_percent / 100, 2);
+        $totalAmount    = $discountedBase + $taxAmt;   // this IS the net payable
+        $netPayable     = $totalAmount;
+    } else {
+        // Discount applied after GST (default)
+        $taxAmt      = round($subtotal * $tax_percent / 100, 2);
+        $totalAmount = $subtotal + $taxAmt;
+        $netPayable  = max(0, $totalAmount - $discount);
+    }
 
     $termsRaw    = array_filter(array_map('trim', $_POST['terms_conditions'] ?? []));
     $termsJson   = !empty($termsRaw) ? json_encode(array_values($termsRaw)) : null;
@@ -63,9 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $db->prepare("UPDATE quotations SET title=?,project_id=?,lead_id=?,client_id=?,valid_until=?,
-            subtotal=?,discount=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=?,terms_conditions=?,currency=? WHERE id=?")
+            subtotal=?,discount=?,discount_type=?,tax_percent=?,tax_amount=?,total_amount=?,status=?,notes=?,terms_conditions=?,currency=? WHERE id=?")
            ->execute([$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$id]);
+                       $subtotal,$discount,$discount_type,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$id]);
         $db->prepare("DELETE FROM quotation_items WHERE quotation_id=?")->execute([$id]);
         setFlash('success','Quotation updated.');
     } else {
@@ -73,10 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $num  = $last && preg_match('/QTN-(\d+)/', $last, $m) ? (int)$m[1]+1 : 1;
         $no   = 'QTN-'.str_pad($num, 4, '0', STR_PAD_LEFT);
         $db->prepare("INSERT INTO quotations (quotation_no,title,project_id,lead_id,client_id,valid_until,
-            subtotal,discount,tax_percent,tax_amount,total_amount,status,notes,terms_conditions,currency,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            subtotal,discount,discount_type,tax_percent,tax_amount,total_amount,status,notes,terms_conditions,currency,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
            ->execute([$no,$title,$project_id,$lead_id,$client_id,$valid_until,
-                      $subtotal,$discount,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$user['id']]);
+                       $subtotal,$discount,$discount_type,$tax_percent,$taxAmt,$netPayable,$status,$notes,$termsJson,$currency,$user['id']]);
         $id = (int)$db->lastInsertId();
         setFlash('success',"Quotation $no created.");
     }
@@ -92,7 +103,7 @@ $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetch
 $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
 
 $q = $quotation ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','valid_until'=>'',
-     'subtotal'=>0,'discount'=>0,'tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null,'currency'=>'INR'];
+     'subtotal'=>0,'discount'=>0,'discount_type'=>'after_gst','tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null,'currency'=>'INR'];
 
 $pageTitle = $id ? 'Edit Quotation' : 'New Quotation';
 include __DIR__ . '/../../includes/header.php';
@@ -220,6 +231,36 @@ include __DIR__ . '/../../includes/header.php';
             <span class="text-muted">Subtotal</span>
             <span class="fw-semibold" id="subtotalDisplay">₹0.00</span>
           </div>
+
+          <!-- Discount Type Toggle -->
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">Discount Type</label>
+            <div class="d-flex gap-2">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="discount_type" id="discBefore" value="before_gst"
+                  <?= ($q['discount_type'] ?? 'after_gst') === 'before_gst' ? 'checked' : '' ?>>
+                <label class="form-check-label small" for="discBefore">Before GST</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="discount_type" id="discAfter" value="after_gst"
+                  <?= ($q['discount_type'] ?? 'after_gst') === 'after_gst' ? 'checked' : '' ?>>
+                <label class="form-check-label small" for="discAfter">After GST</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discount Amount (shown above GST when before_gst) -->
+          <div id="discountBeforeBlock" class="row g-2 align-items-center mb-2" style="display:none!important">
+            <div class="col-6"><label class="form-label small fw-semibold mb-0">Discount</label></div>
+            <div class="col-6 text-end">
+              <input type="number" id="discountInputBefore" class="form-control form-control-sm text-end" value="0" step="0.01" min="0" tabindex="-1">
+            </div>
+          </div>
+          <div id="discountedBaseRow" class="d-flex justify-content-between mb-2" style="display:none!important">
+            <span class="text-muted">After Discount</span>
+            <span id="discountedBaseDisplay">₹0.00</span>
+          </div>
+
           <div class="row g-2 align-items-center mb-2">
             <div class="col-6"><label class="form-label small fw-semibold mb-0">Tax / VAT %</label></div>
             <div class="col-6 text-end">
@@ -231,15 +272,20 @@ include __DIR__ . '/../../includes/header.php';
             <span id="taxDisplay">₹0.00</span>
           </div>
           <div class="d-flex justify-content-between border-top pt-2 mb-3">
-            <span class="fw-semibold">Total Amount</span>
+            <span class="fw-semibold">Total (incl. GST)</span>
             <span class="fw-semibold" id="totalAmountDisplay">₹0.00</span>
           </div>
-          <div class="row g-2 align-items-center mb-3">
+
+          <!-- Discount Amount (shown below GST when after_gst) -->
+          <div id="discountAfterBlock" class="row g-2 align-items-center mb-3">
             <div class="col-6"><label class="form-label small fw-semibold mb-0" id="discountLabel">Discount</label></div>
             <div class="col-6 text-end">
-              <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end" value="<?= $q['discount'] ?>" step="0.01" min="0">
+              <input type="number" id="discountInputAfter" class="form-control form-control-sm text-end" value="<?= $q['discount'] ?>" step="0.01" min="0">
             </div>
           </div>
+
+          <input type="hidden" name="discount" id="discountHidden" value="<?= $q['discount'] ?>">
+
           <hr>
           <div class="d-flex justify-content-between">
             <span class="fw-bold fs-5">Net Payable</span>
@@ -305,22 +351,77 @@ function getCurrencySymbol() {
   return symbols[sel.value] || sel.value;
 }
 
+function getDiscountType() {
+  const checked = document.querySelector('input[name="discount_type"]:checked');
+  return checked ? checked.value : 'after_gst';
+}
+
+function getDiscountValue() {
+  const type = getDiscountType();
+  if (type === 'before_gst') {
+    return parseFloat(document.getElementById('discountInputBefore').value) || 0;
+  } else {
+    return parseFloat(document.getElementById('discountInputAfter').value) || 0;
+  }
+}
+
+function syncDiscountHidden() {
+  document.getElementById('discountHidden').value = getDiscountValue();
+}
+
+function updateDiscountUI() {
+  const type = getDiscountType();
+  const beforeBlock  = document.getElementById('discountBeforeBlock');
+  const afterBlock   = document.getElementById('discountAfterBlock');
+  const baseRow      = document.getElementById('discountedBaseRow');
+
+  if (type === 'before_gst') {
+    beforeBlock.style.setProperty('display', 'flex', 'important');
+    baseRow.style.setProperty('display', 'flex', 'important');
+    afterBlock.style.setProperty('display', 'none', 'important');
+    // Copy value across when switching
+    document.getElementById('discountInputBefore').value = document.getElementById('discountInputAfter').value;
+    document.getElementById('discountInputBefore').removeAttribute('tabindex');
+    document.getElementById('discountInputAfter').setAttribute('tabindex', '-1');
+  } else {
+    beforeBlock.style.setProperty('display', 'none', 'important');
+    baseRow.style.setProperty('display', 'none', 'important');
+    afterBlock.style.setProperty('display', 'flex', 'important');
+    document.getElementById('discountInputAfter').value = document.getElementById('discountInputBefore').value;
+    document.getElementById('discountInputAfter').removeAttribute('tabindex');
+    document.getElementById('discountInputBefore').setAttribute('tabindex', '-1');
+  }
+  recalcTotals();
+}
+
 function recalcTotals() {
-  const sym = getCurrencySymbol();
+  const sym     = getCurrencySymbol();
+  const type    = getDiscountType();
+  const discount = getDiscountValue();
   let sub = 0;
   document.querySelectorAll('.item-amount').forEach(el => sub += parseFloat(el.value) || 0);
-  const taxPct  = parseFloat(document.getElementById('taxInput').value) || 0;
-  const discount = parseFloat(document.getElementById('discountInput').value) || 0;
+  const taxPct = parseFloat(document.getElementById('taxInput').value) || 0;
 
-  const taxAmt = sub * taxPct / 100;
-  const totalAmount = sub + taxAmt;
-  const netPayable  = Math.max(0, totalAmount - discount);
+  let taxBase, taxAmt, totalAmount, netPayable;
+  if (type === 'before_gst') {
+    taxBase     = Math.max(0, sub - discount);
+    taxAmt      = taxBase * taxPct / 100;
+    totalAmount = taxBase + taxAmt;   // net payable = total after disc + GST
+    netPayable  = totalAmount;
+    document.getElementById('discountedBaseDisplay').textContent = sym + taxBase.toFixed(2);
+  } else {
+    taxAmt      = sub * taxPct / 100;
+    totalAmount = sub + taxAmt;
+    netPayable  = Math.max(0, totalAmount - discount);
+  }
 
+  syncDiscountHidden();
   document.getElementById('subtotalDisplay').textContent    = sym + sub.toFixed(2);
   document.getElementById('taxDisplay').textContent         = sym + taxAmt.toFixed(2);
   document.getElementById('totalAmountDisplay').textContent = sym + totalAmount.toFixed(2);
   document.getElementById('netPayableDisplay').textContent  = sym + netPayable.toFixed(2);
-  document.getElementById('discountLabel').textContent      = 'Discount (' + sym + ')';
+  const lbl = document.getElementById('discountLabel');
+  if (lbl) lbl.textContent = 'Discount (' + sym + ')';
 }
 
 function addRow() {
@@ -346,7 +447,27 @@ function attachRowEvents(row) {
 
 document.querySelectorAll('#itemsBody tr').forEach(attachRowEvents);
 document.getElementById('taxInput').addEventListener('input', recalcTotals);
-document.getElementById('discountInput').addEventListener('input', recalcTotals);
+document.getElementById('discountInputBefore').addEventListener('input', recalcTotals);
+document.getElementById('discountInputAfter').addEventListener('input', recalcTotals);
+document.querySelectorAll('input[name="discount_type"]').forEach(r => r.addEventListener('change', updateDiscountUI));
+
+// Remove the hidden duplicate discount field so only one is submitted
+document.querySelector('form').addEventListener('submit', function() {
+  syncDiscountHidden();
+});
+
+// Init UI
+updateDiscountUI();
+// Restore correct value from PHP for the active input
+(function() {
+  const savedDiscount = <?= (float)($q['discount'] ?? 0) ?>;
+  const savedType = '<?= htmlspecialchars($q['discount_type'] ?? 'after_gst') ?>';
+  if (savedType === 'before_gst') {
+    document.getElementById('discountInputBefore').value = savedDiscount;
+  } else {
+    document.getElementById('discountInputAfter').value = savedDiscount;
+  }
+})();
 
 // Terms & Conditions Logic
 function addTermRow(val = '') {
@@ -406,7 +527,7 @@ document.getElementById('quotationProject').addEventListener('change', function(
     });
 });
 
-recalcTotals();
+recalcTotals(); // initial calc after UI is set up
 </script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
