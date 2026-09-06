@@ -331,3 +331,18 @@ CREATE TABLE demos (
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Client Queries & Suggestions
+CREATE TABLE client_queries (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    type ENUM('query', 'suggestion') NOT NULL DEFAULT 'query',
+    description TEXT NOT NULL,
+    status ENUM('pending', 'blocked', 'resolved', 'closed') NOT NULL DEFAULT 'pending',
+    task_link VARCHAR(500) NULL,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);

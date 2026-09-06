@@ -500,12 +500,15 @@ include __DIR__ . '/../../includes/header.php';
 
 /* ===== Print ===== */
 @media print {
+  @page {
+    margin: 1mm;
+  }
   .sidebar, .top-navbar, #topNavbar, .no-print, .col-xl-4 { display: none !important; }
   .col-xl-9 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
   .main-content { margin-left: 0 !important; }
   body { background: white !important; }
   .card { box-shadow: none !important; border: none !important; }
-  .inv-content { padding: 10px 20px 60px 20px; }
+  .inv-content { padding: 5px 20px 20px 20px; }
   .inv-body { overflow: visible !important; }
   .inv-footer {
     position: fixed;

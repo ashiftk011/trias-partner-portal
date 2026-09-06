@@ -62,7 +62,7 @@ if ($isTelecall && $telecallProjectIds) {
 }
 
 $regions  = $db->query("SELECT id,name FROM regions WHERE status='active' ORDER BY name")->fetchAll();
-$agents   = $db->query("SELECT id,name FROM users WHERE role IN ('telecall','admin') AND status='active' ORDER BY name")->fetchAll();
+$agents   = $db->query("SELECT id,name FROM users WHERE status='active' ORDER BY name")->fetchAll();
 
 // Status counts — scoped to the user's visible leads
 $countSql = "SELECT status, COUNT(*) as cnt FROM leads WHERE 1=1";

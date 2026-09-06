@@ -13,11 +13,51 @@ $client = $stmt->fetch();
 if (!$client) redirect(BASE_URL . '/modules/clients/index.php');
 
 // Handle status update
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_status') {
-    verifyCsrf();
-    $db->prepare("UPDATE clients SET status=? WHERE id=?")->execute([$_POST['status'],$id]);
-    setFlash('success','Client status updated.');
-    redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    if ($action === 'update_status') {
+        verifyCsrf();
+        $db->prepare("UPDATE clients SET status=? WHERE id=?")->execute([$_POST['status'],$id]);
+        setFlash('success','Client status updated.');
+        redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
+    }
+    
+    // Handle add query/suggestion
+    if ($action === 'add_query') {
+        verifyCsrf();
+        $type        = $_POST['type'] ?? 'query';
+        $status      = $_POST['status'] ?? 'pending';
+        $taskLink    = trim($_POST['task_link'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $currentUser = currentUser();
+
+        if (!$description) {
+            setFlash('error', 'Description/Details is required.');
+        } else {
+            $db->prepare("INSERT INTO client_queries (client_id, type, description, status, task_link, created_by) VALUES (?, ?, ?, ?, ?, ?)")
+               ->execute([$id, $type, $description, $status, $taskLink ?: null, $currentUser['id']]);
+            setFlash('success', 'Query/Suggestion recorded.');
+        }
+        redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
+    }
+
+    // Handle update query status and link
+    if ($action === 'update_query') {
+        verifyCsrf();
+        $queryId     = (int)($_POST['query_id'] ?? 0);
+        $status      = $_POST['status'] ?? 'pending';
+        $taskLink    = trim($_POST['task_link'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+
+        if (!$queryId || !$description) {
+            setFlash('error', 'Query ID and Description are required.');
+        } else {
+            $db->prepare("UPDATE client_queries SET status = ?, task_link = ?, description = ? WHERE id = ? AND client_id = ?")
+               ->execute([$status, $taskLink ?: null, $description, $queryId, $id]);
+            setFlash('success', 'Query/Suggestion updated.');
+        }
+        redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
+    }
 }
 
 $renewals = $db->prepare("SELECT rn.*,pl.name as plan_name FROM renewals rn LEFT JOIN plans pl ON pl.id=rn.plan_id WHERE rn.client_id=? ORDER BY rn.start_date DESC");
@@ -30,6 +70,10 @@ if (hasAccess('invoices')) {
     $invStmt->execute([$id]);
     $invoices = $invStmt->fetchAll();
 }
+
+$queries = $db->prepare("SELECT cq.*, u.name as by_name FROM client_queries cq LEFT JOIN users u ON u.id = cq.created_by WHERE cq.client_id = ? ORDER BY cq.created_at DESC");
+$queries->execute([$id]);
+$queries = $queries->fetchAll();
 
 $pageTitle = 'Client: ' . $client['name'];
 include __DIR__ . '/../../includes/header.php';
@@ -190,7 +234,168 @@ include __DIR__ . '/../../includes/header.php';
       </div>
     </div>
     <?php endif; ?>
+
+    <!-- Feed Query & Suggestion Form -->
+    <div class="card border-0 shadow-sm mt-4 mb-4">
+      <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-chat-right-dots-fill me-2 text-primary"></i>Feed Query / Suggestion</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+          <input type="hidden" name="action" value="add_query">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Type</label>
+              <select name="type" class="form-select">
+                <option value="query">Query</option>
+                <option value="suggestion">Suggestion</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">Status</label>
+              <select name="status" class="form-select">
+                <option value="pending">Pending</option>
+                <option value="blocked">Blocked</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">PM Task Link</label>
+              <input type="url" name="task_link" class="form-control" placeholder="e.g. https://jira.com/browse/TASK-123">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Description / Details *</label>
+              <textarea name="description" class="form-control" rows="3" required placeholder="Describe the client query or suggestion details..."></textarea>
+            </div>
+          </div>
+          <div class="mt-3 text-end">
+            <button type="submit" class="btn btn-primary btn-sm px-3"><i class="bi bi-send me-1"></i>Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Queries & Suggestions History -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-chat-square-text-fill me-2 text-primary"></i>Queries & Suggestions</span>
+        <span class="badge bg-secondary ms-2"><?= count($queries) ?></span>
+      </div>
+      <div class="card-body p-0">
+        <?php if ($queries): ?>
+        <div class="timeline p-3">
+          <?php foreach ($queries as $q): ?>
+          <div class="timeline-item d-flex gap-3 mb-3">
+            <div class="timeline-icon bg-light border rounded-circle d-flex align-items-center justify-content-center text-primary flex-shrink-0" style="width:36px;height:36px">
+              <?php if ($q['type'] === 'query'): ?>
+              <i class="bi bi-question-circle-fill"></i>
+              <?php else: ?>
+              <i class="bi bi-lightbulb-fill text-warning"></i>
+              <?php endif; ?>
+            </div>
+            <div class="flex-grow-1 border rounded p-3 bg-light">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <span class="fw-semibold small"><?= htmlspecialchars($q['by_name']) ?></span>
+                  <span class="mx-1 text-muted">•</span>
+                  <small class="text-muted"><?= date('d M Y H:i', strtotime($q['created_at'])) ?></small>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                  <!-- Edit/Update Button -->
+                  <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;" onclick='openEditQueryModal(<?= json_encode($q, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' title="Edit/Update Query">
+                    <i class="bi bi-pencil small"></i> Edit
+                  </button>
+                </div>
+              </div>
+              
+              <p class="mb-2 small text-dark text-break" style="white-space: pre-line;"><?= htmlspecialchars($q['description']) ?></p>
+              
+              <div class="d-flex gap-2 flex-wrap align-items-center">
+                <span class="badge bg-secondary small"><?= ucfirst($q['type']) ?></span>
+                
+                <!-- Status Badge -->
+                <?php
+                $statusColors = [
+                    'pending'  => 'warning text-dark',
+                    'blocked'  => 'danger',
+                    'resolved' => 'success',
+                    'closed'   => 'secondary'
+                ];
+                $color = $statusColors[$q['status']] ?? 'secondary';
+                ?>
+                <span class="badge bg-<?= $color ?> small"><?= ucfirst($q['status']) ?></span>
+                
+                <!-- PM Link if exists -->
+                <?php if ($q['task_link']): ?>
+                <a href="<?= htmlspecialchars($q['task_link']) ?>" target="_blank" class="badge bg-info text-decoration-none small d-inline-flex align-items-center gap-1">
+                  <i class="bi bi-link-45deg"></i> PM Task <i class="bi bi-box-arrow-up-right" style="font-size: 0.7rem;"></i>
+                </a>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <div class="text-center text-muted py-4"><i class="bi bi-chat-left-text fs-3 d-block mb-2"></i>No queries or suggestions logged yet.</div>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Edit Query Modal -->
+<div class="modal fade" id="editQueryModal" tabindex="-1" aria-labelledby="editQueryModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <input type="hidden" name="action" value="update_query">
+        <input type="hidden" name="query_id" id="editQueryId">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editQueryModalLabel">Update Query / Suggestion</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Status</label>
+              <select name="status" id="editQueryStatus" class="form-select">
+                <option value="pending">Pending</option>
+                <option value="blocked">Blocked</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">PM Task Link</label>
+              <input type="url" name="task_link" id="editQueryTaskLink" class="form-control" placeholder="https://jira.com/browse/TASK-123">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Description / Details *</label>
+              <textarea name="description" id="editQueryDescription" class="form-control" rows="3" required></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openEditQueryModal(q) {
+  document.getElementById('editQueryId').value = q.id;
+  document.getElementById('editQueryStatus').value = q.status;
+  document.getElementById('editQueryTaskLink').value = q.task_link || '';
+  document.getElementById('editQueryDescription').value = q.description;
+  
+  const modal = new bootstrap.Modal(document.getElementById('editQueryModal'));
+  modal.show();
+}
+</script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
