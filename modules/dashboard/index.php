@@ -72,8 +72,63 @@ if (hasAccess('invoices')) {
     $stats['revenue_month']    = $db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE MONTH(payment_date)=MONTH(NOW()) AND YEAR(payment_date)=YEAR(NOW())")->fetchColumn();
 }
 
-if (hasAccess('renewals')) {
-    $stats['expiring_soon'] = $db->query("SELECT COUNT(*) FROM renewals WHERE status='active' AND end_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)")->fetchColumn();
+if (hasAccess('renewals') || hasAccess('clients')) {
+    // Fetch clients expiring soon (Hosting server expiry or Plan end date <= 15 days)
+    $sqlExp = "SELECT c.id, c.name as client_name, c.company, c.phone, p.name as project_name,
+                      cs_host.setting_value as hosting_expiry,
+                      cs_plan.setting_value as plan_setting_end_date,
+                      (SELECT end_date FROM renewals WHERE client_id = c.id AND status = 'active' ORDER BY end_date DESC LIMIT 1) as renewal_end_date
+               FROM clients c
+               LEFT JOIN projects p ON p.id = c.project_id
+               LEFT JOIN client_settings cs_host ON cs_host.client_id = c.id AND cs_host.setting_key = 'hosting_expiry'
+               LEFT JOIN client_settings cs_plan ON cs_plan.client_id = c.id AND cs_plan.setting_key = 'plan_end_date'
+               WHERE c.status = 'active'";
+
+    if ($isInvestor && $investorProjectId) {
+        $sqlExp .= " AND c.project_id = " . (int)$investorProjectId;
+    }
+
+    $stmtExp = $db->query($sqlExp);
+    $allClientsExp = $stmtExp->fetchAll();
+
+    $todayStr = date('Y-m-d');
+    $todayTs  = strtotime($todayStr);
+
+    $expiringClients = [];
+    foreach ($allClientsExp as $c) {
+        $hostExp = !empty($c['hosting_expiry']) ? $c['hosting_expiry'] : null;
+        $planExp = !empty($c['plan_setting_end_date']) ? $c['plan_setting_end_date'] : (!empty($c['renewal_end_date']) ? $c['renewal_end_date'] : null);
+
+        $hostDaysLeft = null;
+        if ($hostExp) {
+            $hostDaysLeft = (int)floor((strtotime($hostExp) - $todayTs) / 86400);
+        }
+
+        $planDaysLeft = null;
+        if ($planExp) {
+            $planDaysLeft = (int)floor((strtotime($planExp) - $todayTs) / 86400);
+        }
+
+        $isHostExpiring = ($hostDaysLeft !== null && $hostDaysLeft <= 15);
+        $isPlanExpiring = ($planDaysLeft !== null && $planDaysLeft <= 15);
+
+        if ($isHostExpiring || $isPlanExpiring) {
+            $expiringClients[] = [
+                'id'             => $c['id'],
+                'client_name'    => $c['client_name'],
+                'company'        => $c['company'],
+                'phone'          => $c['phone'],
+                'project_name'   => $c['project_name'],
+                'hosting_expiry' => $hostExp,
+                'host_days_left' => $hostDaysLeft,
+                'is_host_exp'    => $isHostExpiring,
+                'plan_end_date'  => $planExp,
+                'plan_days_left' => $planDaysLeft,
+                'is_plan_exp'    => $isPlanExpiring,
+            ];
+        }
+    }
+    $stats['expiring_soon'] = count($expiringClients);
 }
 
 // Recent leads (scoped per role)
@@ -94,9 +149,9 @@ if (hasAccess('leads')) {
     }
 }
 
-// Recent payments (for finance + admin)
+// Recent payments (for finance, accounts + admin)
 $recentPayments = [];
-if (hasAccess('invoices')) {
+if (hasAccess('invoices') || hasAccess('payments')) {
     $stmt = $db->query("SELECT py.*, c.name as client_name, i.invoice_no FROM payments py LEFT JOIN clients c ON c.id=py.client_id LEFT JOIN invoices i ON i.id=py.invoice_id ORDER BY py.created_at DESC LIMIT 5");
     $recentPayments = $stmt->fetchAll();
 }
@@ -163,7 +218,7 @@ include __DIR__ . '/../../includes/header.php';
           <div class="stat-value fw-bold fs-3"><?= number_format($stats['total_clients']) ?></div>
           <div class="stat-label text-muted small">Active Clients</div>
           <?php if (isset($stats['expiring_soon'])): ?>
-          <div class="mt-1"><span class="badge bg-warning text-dark"><?= $stats['expiring_soon'] ?> Expiring</span></div>
+          <div class="mt-1"><span class="badge bg-warning text-dark"><?= $stats['expiring_soon'] ?> Expiring (15d)</span></div>
           <?php endif; ?>
         </div>
       </div>
@@ -194,6 +249,92 @@ include __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 </div>
+
+<!-- Clients Expiring Soon (Hosting Server & Plan End Date <= 15 Days) -->
+<?php if ((hasAccess('clients') || hasAccess('renewals')) && !empty($expiringClients)): ?>
+<div class="card border-0 shadow-sm mb-4 border-start border-4 border-warning">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+    <h6 class="mb-0 fw-semibold text-dark">
+      <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Clients Expiring Soon (Hosting & Plan ≤ 15 Days)
+    </h6>
+    <span class="badge bg-warning text-dark font-monospace px-2 py-1"><?= count($expiringClients) ?> Client(s)</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Client Name</th>
+            <th>Project</th>
+            <th>Hosting Server Expiry</th>
+            <th>Plan End Date</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($expiringClients as $ec): ?>
+          <tr>
+            <td>
+              <a href="<?= BASE_URL ?>/modules/clients/view.php?id=<?= $ec['id'] ?>" class="fw-semibold text-decoration-none">
+                <?= htmlspecialchars($ec['client_name']) ?>
+              </a>
+              <?php if ($ec['company']): ?>
+              <div class="text-muted small"><?= htmlspecialchars($ec['company']) ?></div>
+              <?php endif; ?>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border"><?= htmlspecialchars($ec['project_name'] ?? 'N/A') ?></span>
+            </td>
+            <td>
+              <?php if ($ec['hosting_expiry']): ?>
+                <div class="fw-semibold small"><?= date('d M Y', strtotime($ec['hosting_expiry'])) ?></div>
+                <?php if ($ec['host_days_left'] < 0): ?>
+                  <span class="badge bg-danger">Expired (<?= abs($ec['host_days_left']) ?>d ago)</span>
+                <?php elseif ($ec['host_days_left'] === 0): ?>
+                  <span class="badge bg-danger">Expires Today</span>
+                <?php elseif ($ec['is_host_exp']): ?>
+                  <span class="badge bg-warning text-dark"><?= $ec['host_days_left'] ?> days left</span>
+                <?php else: ?>
+                  <span class="badge bg-secondary"><?= $ec['host_days_left'] ?> days left</span>
+                <?php endif; ?>
+              <?php else: ?>
+                <span class="text-muted small">Not set</span>
+              <?php endif; ?>
+            </td>
+            <td>
+              <?php if ($ec['plan_end_date']): ?>
+                <div class="fw-semibold small"><?= date('d M Y', strtotime($ec['plan_end_date'])) ?></div>
+                <?php if ($ec['plan_days_left'] < 0): ?>
+                  <span class="badge bg-danger">Expired (<?= abs($ec['plan_days_left']) ?>d ago)</span>
+                <?php elseif ($ec['plan_days_left'] === 0): ?>
+                  <span class="badge bg-danger">Expires Today</span>
+                <?php elseif ($ec['is_plan_exp']): ?>
+                  <span class="badge bg-warning text-dark"><?= $ec['plan_days_left'] ?> days left</span>
+                <?php else: ?>
+                  <span class="badge bg-secondary"><?= $ec['plan_days_left'] ?> days left</span>
+                <?php endif; ?>
+              <?php else: ?>
+                <span class="text-muted small">Not set</span>
+              <?php endif; ?>
+            </td>
+            <td class="text-center">
+              <div class="btn-group btn-group-sm">
+                <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $ec['id'] ?>" class="btn btn-outline-primary" title="Settings">
+                  <i class="bi bi-gear me-1"></i> Settings
+                </a>
+                <a href="<?= BASE_URL ?>/modules/clients/view.php?id=<?= $ec['id'] ?>" class="btn btn-outline-secondary" title="View Details">
+                  <i class="bi bi-eye"></i> View
+                </a>
+              </div>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="row g-4">
   <!-- Recent Leads -->
@@ -236,12 +377,12 @@ include __DIR__ . '/../../includes/header.php';
   <?php endif; ?>
 
   <!-- Recent Payments -->
-  <?php if (hasAccess('invoices') && $recentPayments): ?>
+  <?php if ((hasAccess('invoices') || hasAccess('payments')) && $recentPayments): ?>
   <div class="col-xl-5">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h6 class="mb-0 fw-semibold"><i class="bi bi-cash-stack me-2 text-success"></i>Recent Payments</h6>
-        <a href="<?= BASE_URL ?>/modules/invoices/index.php" class="btn btn-sm btn-outline-success">View All</a>
+        <a href="<?= BASE_URL ?>/modules/payments/index.php" class="btn btn-sm btn-outline-success">View All</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">

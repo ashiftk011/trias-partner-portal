@@ -30,6 +30,12 @@ $settingDefs = [
     'db_connection'     => ['label' => 'DB Connection String',  'type' => 'text'],
     'db_username'       => ['label' => 'DB Username',           'type' => 'text'],
     'db_password'       => ['label' => 'DB Password',           'type' => 'password'],
+    // Plan Details
+    'plan_type'            => ['label' => 'Plan Type',             'type' => 'select', 'options' => ['Monthly', 'Yearly']],
+    'plan_start_date'      => ['label' => 'Start Date',            'type' => 'date'],
+    'plan_end_date'        => ['label' => 'End Date',              'type' => 'date'],
+    'api_integration_code' => ['label' => 'API Integration Code',  'type' => 'text'],
+    'environment_name'     => ['label' => 'Environment Name',      'type' => 'text'],
     // Analytics & Social
     'google_analytics'  => ['label' => 'Google Analytics ID',   'type' => 'text'],
     'facebook_page'     => ['label' => 'Facebook Page URL',     'type' => 'url'],
@@ -216,6 +222,52 @@ include __DIR__ . '/../../includes/header.php';
       </div>
     </div>
 
+    <!-- Plan Details -->
+    <div class="col-xl-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-box-seam me-2 text-primary"></i>Plan Details</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Plan Type</label>
+            <select name="settings[plan_type]" id="plan_type" class="form-select form-select-sm">
+              <option value="">-- Select --</option>
+              <?php foreach ($settingDefs['plan_type']['options'] as $opt): ?>
+              <option value="<?= $opt ?>" <?= ($existing['plan_type'] ?? '') === $opt ? 'selected' : '' ?>><?= $opt ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold">Start Date</label>
+              <input type="date" name="settings[plan_start_date]" id="plan_start_date"
+                     class="form-control form-control-sm"
+                     value="<?= htmlspecialchars($existing['plan_start_date'] ?? '') ?>">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold">End Date</label>
+              <input type="date" name="settings[plan_end_date]" id="plan_end_date"
+                     class="form-control form-control-sm"
+                     value="<?= htmlspecialchars($existing['plan_end_date'] ?? '') ?>">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">API Integration Code</label>
+            <input type="text" name="settings[api_integration_code]"
+                   class="form-control form-control-sm"
+                   value="<?= htmlspecialchars($existing['api_integration_code'] ?? '') ?>"
+                   placeholder="e.g. API-INT-1029">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Environment Name</label>
+            <input type="text" name="settings[environment_name]"
+                   class="form-control form-control-sm"
+                   value="<?= htmlspecialchars($existing['environment_name'] ?? '') ?>"
+                   placeholder="e.g. Production, Staging, Development">
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Social & Analytics -->
     <div class="col-xl-6">
       <div class="card border-0 shadow-sm">
@@ -359,6 +411,55 @@ function toggleVis(btn) {
   if (input.type === 'password') { input.type = 'text'; icon.className = 'bi bi-eye-slash'; }
   else { input.type = 'password'; icon.className = 'bi bi-eye'; }
 }
+
+function calculateEndDate(startDateStr, planType) {
+  if (!startDateStr) return '';
+  const parts = startDateStr.split('-');
+  if (parts.length !== 3) return '';
+  
+  let year = parseInt(parts[0], 10);
+  let month = parseInt(parts[1], 10) - 1;
+  let day = parseInt(parts[2], 10);
+
+  let date = new Date(year, month, day);
+
+  if (planType === 'Yearly') {
+    date.setFullYear(date.getFullYear() + 1);
+  } else {
+    date.setMonth(date.getMonth() + 1);
+  }
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const startDateInput = document.getElementById('plan_start_date');
+  const endDateInput = document.getElementById('plan_end_date');
+  const planTypeSelect = document.getElementById('plan_type');
+
+  function updateEndDate() {
+    if (!startDateInput || !endDateInput) return;
+    const startDateVal = startDateInput.value;
+    const planTypeVal = planTypeSelect ? planTypeSelect.value : 'Monthly';
+    if (startDateVal) {
+      endDateInput.value = calculateEndDate(startDateVal, planTypeVal);
+    }
+  }
+
+  if (startDateInput) {
+    startDateInput.addEventListener('change', updateEndDate);
+  }
+  if (planTypeSelect) {
+    planTypeSelect.addEventListener('change', function() {
+      if (startDateInput && startDateInput.value) {
+        updateEndDate();
+      }
+    });
+  }
+});
 </script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>

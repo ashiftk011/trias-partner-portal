@@ -75,6 +75,13 @@ $queries = $db->prepare("SELECT cq.*, u.name as by_name FROM client_queries cq L
 $queries->execute([$id]);
 $queries = $queries->fetchAll();
 
+$existingSettings = [];
+$settingsResult = $db->prepare("SELECT setting_key, setting_value FROM client_settings WHERE client_id=?");
+$settingsResult->execute([$id]);
+foreach ($settingsResult->fetchAll() as $row) {
+    $existingSettings[$row['setting_key']] = $row['setting_value'];
+}
+
 $pageTitle = 'Client: ' . $client['name'];
 include __DIR__ . '/../../includes/header.php';
 ?>
@@ -155,6 +162,33 @@ include __DIR__ . '/../../includes/header.php';
         <?php if ($client['pan_no']): ?><div class="small"><strong>PAN:</strong> <?= htmlspecialchars($client['pan_no']) ?></div><?php endif; ?>
       </div>
     </div>
+
+    <?php if (!empty($existingSettings['plan_type']) || !empty($existingSettings['plan_start_date']) || !empty($existingSettings['api_integration_code']) || !empty($existingSettings['environment_name'])): ?>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-box-seam me-2 text-primary"></i>Plan & Integration Details</span>
+        <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>" class="btn btn-sm btn-link p-0 text-decoration-none"><i class="bi bi-pencil"></i> Edit</a>
+      </div>
+      <div class="card-body">
+        <?php
+        $planDetails = [
+          'Plan Type'              => $existingSettings['plan_type'] ?? '',
+          'Start Date'             => !empty($existingSettings['plan_start_date']) ? date('d M Y', strtotime($existingSettings['plan_start_date'])) : '',
+          'End Date'               => !empty($existingSettings['plan_end_date']) ? date('d M Y', strtotime($existingSettings['plan_end_date'])) : '',
+          'API Integration Code'   => $existingSettings['api_integration_code'] ?? '',
+          'Environment Name'       => $existingSettings['environment_name'] ?? '',
+        ];
+        foreach ($planDetails as $label => $value):
+          if (!$value) continue;
+        ?>
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small"><?= $label ?></span>
+          <span class="fw-semibold small text-end"><?= htmlspecialchars($value) ?></span>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- Renewals + Invoices -->

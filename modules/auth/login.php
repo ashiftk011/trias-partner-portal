@@ -34,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect(BASE_URL . '/modules/leads/index.php');
             } elseif ($user['role'] === 'finance') {
                 redirect(BASE_URL . '/modules/invoices/index.php');
+            } elseif ($user['role'] === 'accounts') {
+                redirect(BASE_URL . '/modules/payments/index.php');
             } else {
                 redirect(BASE_URL . '/modules/dashboard/index.php');
             }
@@ -109,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <strong class="d-block mb-1 text-muted">Demo Credentials</strong>
             <div><span class="badge bg-danger me-1">Admin</span> admin@trias.com / password</div>
             <div><span class="badge bg-success me-1">Finance</span> finance@trias.com / password</div>
+            <div><span class="badge text-white me-1" style="background-color:#6f42c1;">Accounts</span> accounts@trias.com / password</div>
             <div><span class="badge bg-primary me-1">Telecall</span> telecall@trias.com / password</div>
           </div>
         </div>

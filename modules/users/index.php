@@ -182,6 +182,7 @@ include __DIR__ . '/../../includes/header.php';
               <select name="role" id="uRole" class="form-select" required onchange="toggleInvestorProject(this.value)">
                 <option value="telecall">Telecall</option>
                 <option value="finance">Finance</option>
+                <option value="accounts">Accounts</option>
                 <option value="admin">Admin</option>
                 <option value="investor">Investor</option>
                 <option value="csm">Client Success Manager</option>

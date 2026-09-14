@@ -7,8 +7,9 @@ require_once __DIR__ . '/../config/db.php';
 
 // Role permission map
 const ROLE_PERMISSIONS = [
-    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','settings','proposals','quotations','demos','regions'],
-    'finance'  => ['dashboard','invoices','clients','renewals'],
+    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','payments','settings','proposals','quotations','demos','regions'],
+    'finance'  => ['dashboard','invoices','clients','renewals','payments'],
+    'accounts' => ['dashboard','payments','invoices'],
     'telecall' => ['dashboard','leads'],
     'investor' => ['dashboard','clients','leads'],
     'csm'      => ['dashboard','leads','clients','proposals','quotations','demos'],
@@ -142,6 +143,7 @@ function roleLabel(string $role): string {
     return match($role) {
         'admin'    => '<span class="badge bg-danger">Admin</span>',
         'finance'  => '<span class="badge bg-success">Finance</span>',
+        'accounts' => '<span class="badge text-white" style="background-color:#6f42c1;">Accounts</span>',
         'telecall' => '<span class="badge bg-primary">Telecall</span>',
         'investor' => '<span class="badge bg-warning text-dark">Investor</span>',
         'csm'      => '<span class="badge bg-info text-dark">CSM</span>',

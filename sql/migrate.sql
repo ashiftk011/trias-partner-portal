@@ -15,15 +15,15 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'finance', 'telecall', 'investor', 'csm') DEFAULT 'telecall',
+    role ENUM('admin', 'finance', 'telecall', 'investor', 'csm', 'accounts') DEFAULT 'telecall',
     phone VARCHAR(20),
     status ENUM('active', 'inactive') DEFAULT 'active',
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Add csm role to existing databases (safe to run multiple times)
-ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'finance', 'telecall', 'investor', 'csm') DEFAULT 'telecall';
+-- Add csm and accounts role to existing databases (safe to run multiple times)
+ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'finance', 'telecall', 'investor', 'csm', 'accounts') DEFAULT 'telecall';
 
 -- ============================================================
 -- 2. REGIONS
