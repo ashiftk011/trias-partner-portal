@@ -14,70 +14,73 @@ if ($id) {
     if (!$client) { setFlash('danger','Client not found.'); redirect(BASE_URL . '/modules/clients/index.php'); }
 }
 
-// Generate next client code
-function generateClientCode($db) {
-    $row = $db->query("SELECT client_code FROM clients ORDER BY id DESC LIMIT 1")->fetch();
-    if ($row && preg_match('/CLT-(\d+)/', $row['client_code'], $m)) {
-        return 'CLT-' . str_pad((int)$m[1] + 1, 4, '0', STR_PAD_LEFT);
+// Local wrapper for client code generation
+if (!function_exists('generateClientCode')) {
+    function generateClientCode($db) {
+        return generateCode('CLT-', 'clients', 'client_code');
     }
-    return 'CLT-0001';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
-    $data = [
-        'name'        => trim($_POST['name'] ?? ''),
-        'email'       => trim($_POST['email'] ?? ''),
-        'phone'       => trim($_POST['phone'] ?? ''),
-        'alt_phone'   => trim($_POST['alt_phone'] ?? ''),
-        'company'     => trim($_POST['company'] ?? ''),
-        'designation' => trim($_POST['designation'] ?? ''),
-        'project_id'  => (int)($_POST['project_id'] ?? 0),
-        'plan_id'     => $_POST['plan_id'] ? (int)$_POST['plan_id'] : null,
-        'region_id'   => $_POST['region_id'] ? (int)$_POST['region_id'] : null,
-        'address'     => trim($_POST['address'] ?? ''),
-        'city'        => trim($_POST['city'] ?? ''),
-        'state'       => trim($_POST['state'] ?? ''),
-        'pincode'     => trim($_POST['pincode'] ?? ''),
-        'gst_no'      => trim($_POST['gst_no'] ?? ''),
-        'pan_no'      => trim($_POST['pan_no'] ?? ''),
-        'joined_date' => $_POST['joined_date'] ?: date('Y-m-d'),
-        'status'      => $_POST['status'] ?? 'active',
-    ];
+    try {
+        $data = [
+            'name'        => trim($_POST['name'] ?? ''),
+            'email'       => trim($_POST['email'] ?? ''),
+            'phone'       => trim($_POST['phone'] ?? ''),
+            'alt_phone'   => trim($_POST['alt_phone'] ?? ''),
+            'company'     => trim($_POST['company'] ?? ''),
+            'designation' => trim($_POST['designation'] ?? ''),
+            'project_id'  => (int)($_POST['project_id'] ?? 0),
+            'plan_id'     => $_POST['plan_id'] ? (int)$_POST['plan_id'] : null,
+            'region_id'   => $_POST['region_id'] ? (int)$_POST['region_id'] : null,
+            'address'     => trim($_POST['address'] ?? ''),
+            'city'        => trim($_POST['city'] ?? ''),
+            'state'       => trim($_POST['state'] ?? ''),
+            'pincode'     => trim($_POST['pincode'] ?? ''),
+            'gst_no'      => trim($_POST['gst_no'] ?? ''),
+            'pan_no'      => trim($_POST['pan_no'] ?? ''),
+            'joined_date' => $_POST['joined_date'] ?: date('Y-m-d'),
+            'status'      => $_POST['status'] ?? 'active',
+        ];
 
-    if (!$data['name'] || !$data['project_id']) {
-        setFlash('danger', 'Client name and project are required.');
+        if (!$data['name'] || !$data['project_id']) {
+            setFlash('error', 'Client name and project are required.');
+            redirect(BASE_URL . '/modules/clients/save.php' . ($id ? "?id=$id" : ''));
+        }
+
+        if ($id) {
+            // Update
+            $db->prepare("UPDATE clients SET name=?,email=?,phone=?,alt_phone=?,company=?,designation=?,
+                project_id=?,plan_id=?,region_id=?,address=?,city=?,state=?,pincode=?,gst_no=?,pan_no=?,
+                joined_date=?,status=? WHERE id=?")
+               ->execute([
+                   $data['name'],$data['email'],$data['phone'],$data['alt_phone'],$data['company'],$data['designation'],
+                   $data['project_id'],$data['plan_id'],$data['region_id'],$data['address'],$data['city'],
+                   $data['state'],$data['pincode'],$data['gst_no'],$data['pan_no'],$data['joined_date'],$data['status'],$id
+               ]);
+            setFlash('success', 'Client updated successfully.');
+        } else {
+            // Insert
+            $clientCode = generateClientCode($db);
+            $db->prepare("INSERT INTO clients (client_code,name,email,phone,alt_phone,company,designation,
+                project_id,plan_id,region_id,address,city,state,pincode,gst_no,pan_no,joined_date,status)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+               ->execute([
+                   $clientCode,$data['name'],$data['email'],$data['phone'],$data['alt_phone'],$data['company'],
+                   $data['designation'],$data['project_id'],$data['plan_id'],$data['region_id'],$data['address'],
+                   $data['city'],$data['state'],$data['pincode'],$data['gst_no'],$data['pan_no'],
+                   $data['joined_date'],$data['status']
+               ]);
+            $id = $db->lastInsertId();
+            setFlash('success', "Client created with code $clientCode.");
+        }
+        redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
+    } catch (\Throwable $e) {
+        setFlash('error', 'Client Save Failed: ' . $e->getMessage());
         redirect(BASE_URL . '/modules/clients/save.php' . ($id ? "?id=$id" : ''));
     }
-
-    if ($id) {
-        // Update
-        $db->prepare("UPDATE clients SET name=?,email=?,phone=?,alt_phone=?,company=?,designation=?,
-            project_id=?,plan_id=?,region_id=?,address=?,city=?,state=?,pincode=?,gst_no=?,pan_no=?,
-            joined_date=?,status=? WHERE id=?")
-           ->execute([
-               $data['name'],$data['email'],$data['phone'],$data['alt_phone'],$data['company'],$data['designation'],
-               $data['project_id'],$data['plan_id'],$data['region_id'],$data['address'],$data['city'],
-               $data['state'],$data['pincode'],$data['gst_no'],$data['pan_no'],$data['joined_date'],$data['status'],$id
-           ]);
-        setFlash('success', 'Client updated successfully.');
-    } else {
-        // Insert
-        $clientCode = generateClientCode($db);
-        $db->prepare("INSERT INTO clients (client_code,name,email,phone,alt_phone,company,designation,
-            project_id,plan_id,region_id,address,city,state,pincode,gst_no,pan_no,joined_date,status)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-           ->execute([
-               $clientCode,$data['name'],$data['email'],$data['phone'],$data['alt_phone'],$data['company'],
-               $data['designation'],$data['project_id'],$data['plan_id'],$data['region_id'],$data['address'],
-               $data['city'],$data['state'],$data['pincode'],$data['gst_no'],$data['pan_no'],
-               $data['joined_date'],$data['status']
-           ]);
-        $id = $db->lastInsertId();
-        setFlash('success', "Client created with code $clientCode.");
-    }
-    redirect(BASE_URL . '/modules/clients/view.php?id=' . $id);
 }
 
 // Form data

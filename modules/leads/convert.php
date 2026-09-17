@@ -21,47 +21,52 @@ $regions = $db->query("SELECT id,name FROM regions WHERE status='active' ORDER B
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
-    $name       = trim($_POST['name']);
-    $email      = trim($_POST['email'] ?? '');
-    $phone      = trim($_POST['phone']);
-    $company    = trim($_POST['company'] ?? '');
-    $designation= trim($_POST['designation'] ?? '');
-    $address    = trim($_POST['address'] ?? '');
-    $city       = trim($_POST['city'] ?? '');
-    $state      = trim($_POST['state'] ?? '');
-    $pincode    = trim($_POST['pincode'] ?? '');
-    $gst        = trim($_POST['gst_no'] ?? '');
-    $pan        = trim($_POST['pan_no'] ?? '');
-    $projectId  = (int)$_POST['project_id'];
-    $planId     = $_POST['plan_id'] ? (int)$_POST['plan_id'] : null;
-    $regionId   = $_POST['region_id'] ? (int)$_POST['region_id'] : null;
-    $joinedDate = $_POST['joined_date'] ?: date('Y-m-d');
+    try {
+        $name       = trim($_POST['name']);
+        $email      = trim($_POST['email'] ?? '');
+        $phone      = trim($_POST['phone']);
+        $company    = trim($_POST['company'] ?? '');
+        $designation= trim($_POST['designation'] ?? '');
+        $address    = trim($_POST['address'] ?? '');
+        $city       = trim($_POST['city'] ?? '');
+        $state      = trim($_POST['state'] ?? '');
+        $pincode    = trim($_POST['pincode'] ?? '');
+        $gst        = trim($_POST['gst_no'] ?? '');
+        $pan        = trim($_POST['pan_no'] ?? '');
+        $projectId  = (int)$_POST['project_id'];
+        $planId     = $_POST['plan_id'] ? (int)$_POST['plan_id'] : null;
+        $regionId   = $_POST['region_id'] ? (int)$_POST['region_id'] : null;
+        $joinedDate = $_POST['joined_date'] ?: date('Y-m-d');
 
-    // Create client
-    $clientCode = generateCode('CL', 'clients', 'client_code');
-    $db->prepare("INSERT INTO clients (client_code,lead_id,project_id,plan_id,region_id,name,email,phone,company,designation,address,city,state,pincode,gst_no,pan_no,joined_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-       ->execute([$clientCode,$id,$projectId,$planId,$regionId,$name,$email,$phone,$company,$designation,$address,$city,$state,$pincode,$gst,$pan,$joinedDate]);
+        // Create client using consistent generateClientCode
+        $clientCode = generateClientCode($db);
+        $db->prepare("INSERT INTO clients (client_code,lead_id,project_id,plan_id,region_id,name,email,phone,company,designation,address,city,state,pincode,gst_no,pan_no,joined_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+           ->execute([$clientCode,$id,$projectId,$planId,$regionId,$name,$email,$phone,$company,$designation,$address,$city,$state,$pincode,$gst,$pan,$joinedDate]);
 
-    $clientId = $db->lastInsertId();
+        $clientId = $db->lastInsertId();
 
-    // Create initial renewal if plan has duration
-    if ($planId) {
-        $planInfo = $db->prepare("SELECT * FROM plans WHERE id=?");
-        $planInfo->execute([$planId]);
-        $planInfo = $planInfo->fetch();
+        // Create initial renewal if plan has duration
+        if ($planId) {
+            $planInfo = $db->prepare("SELECT * FROM plans WHERE id=?");
+            $planInfo->execute([$planId]);
+            $planInfo = $planInfo->fetch();
 
-        if ($planInfo && $planInfo['duration_months'] > 0) {
-            $endDate = date('Y-m-d', strtotime("+{$planInfo['duration_months']} months", strtotime($joinedDate)));
-            $db->prepare("INSERT INTO renewals (client_id,plan_id,start_date,end_date,amount,status,renewed_by) VALUES (?,?,?,?,?,?,?)")
-               ->execute([$clientId,$planId,$joinedDate,$endDate,$planInfo['price'],'active',currentUser()['id']]);
+            if ($planInfo && $planInfo['duration_months'] > 0) {
+                $endDate = date('Y-m-d', strtotime("+{$planInfo['duration_months']} months", strtotime($joinedDate)));
+                $db->prepare("INSERT INTO renewals (client_id,plan_id,start_date,end_date,amount,status,renewed_by) VALUES (?,?,?,?,?,?,?)")
+                   ->execute([$clientId,$planId,$joinedDate,$endDate,$planInfo['price'],'active',currentUser()['id']]);
+            }
         }
+
+        // Mark lead as converted
+        $db->prepare("UPDATE leads SET status='converted' WHERE id=?")->execute([$id]);
+
+        setFlash('success', "Lead converted to client successfully! Client Code: {$clientCode}");
+        redirect(BASE_URL . '/modules/clients/view.php?id=' . $clientId);
+    } catch (\Throwable $e) {
+        setFlash('error', 'Lead Conversion Failed: ' . $e->getMessage());
+        redirect(BASE_URL . '/modules/leads/convert.php?id=' . $id);
     }
-
-    // Mark lead as converted
-    $db->prepare("UPDATE leads SET status='converted' WHERE id=?")->execute([$id]);
-
-    setFlash('success', "Lead converted to client successfully! Client Code: {$clientCode}");
-    redirect(BASE_URL . '/modules/clients/view.php?id=' . $clientId);
 }
 
 $pageTitle = 'Convert Lead to Client';

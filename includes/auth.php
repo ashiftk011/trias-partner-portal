@@ -111,13 +111,90 @@ function displayFlash(): void {
     foreach (['success', 'error', 'warning', 'info'] as $type) {
         $msg = getFlash($type);
         if ($msg) {
-            $cls = ['success'=>'success','error'=>'danger','warning'=>'warning','info'=>'info'][$type];
-            echo "<div class='alert alert-{$cls} alert-dismissible fade show' role='alert'>
-                    <i class='bi bi-" . ($type==='success'?'check-circle':'exclamation-circle') . "-fill me-2'></i>"
-                    . htmlspecialchars($msg) . "
-                    <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                  </div>";
+            if ($type === 'error') {
+                // Render exact error popup modal
+                echo "<div class='modal fade' id='errorDetailModal' tabindex='-1' aria-labelledby='errorDetailModalLabel' aria-hidden='true'>
+                        <div class='modal-dialog modal-dialog-centered'>
+                          <div class='modal-content border-0 shadow-lg'>
+                            <div class='modal-header bg-danger text-white py-3'>
+                              <h5 class='modal-title fw-bold mb-0' id='errorDetailModalLabel'>
+                                <i class='bi bi-exclamation-triangle-fill me-2'></i>Error Details
+                              </h5>
+                              <button type='button' class='btn-close btn-close-white' data-bs-dismiss='modal' aria-label='Close'></button>
+                            </div>
+                            <div class='modal-body p-4'>
+                              <div class='alert alert-danger font-monospace small mb-3 text-break me-0'>
+                                " . htmlspecialchars($msg) . "
+                              </div>
+                              <p class='text-muted small mb-2'>Exact error response received from system:</p>
+                              <textarea id='errorModalCopyText' class='form-control form-control-sm font-monospace bg-light text-dark mb-2' rows='4' readonly>" . htmlspecialchars($msg) . "</textarea>
+                            </div>
+                            <div class='modal-footer bg-light py-2'>
+                              <button type='button' class='btn btn-outline-secondary btn-sm' onclick='copyErrorModalMessage()'>
+                                <i class='bi bi-clipboard me-1'></i>Copy Error
+                              </button>
+                              <button type='button' class='btn btn-danger btn-sm' data-bs-dismiss='modal'>Close</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                          var modalEl = document.getElementById('errorDetailModal');
+                          if (modalEl && typeof bootstrap !== 'undefined') {
+                            var bsModal = new bootstrap.Modal(modalEl);
+                            bsModal.show();
+                          }
+                        });
+                        function copyErrorModalMessage() {
+                          var txt = document.getElementById('errorModalCopyText');
+                          if (txt) {
+                            txt.select();
+                            navigator.clipboard.writeText(txt.value);
+                            alert('Error text copied to clipboard!');
+                          }
+                        }
+                      </script>";
+            } else {
+                $cls = ['success'=>'success','warning'=>'warning','info'=>'info'][$type];
+                echo "<div class='alert alert-{$cls} alert-dismissible fade show' role='alert'>
+                        <i class='bi bi-" . ($type==='success'?'check-circle':'exclamation-circle') . "-fill me-2'></i>"
+                        . htmlspecialchars($msg) . "
+                        <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
+                      </div>";
+            }
         }
+    }
+}
+
+// Reliable sequential client code generator (e.g. CLT-0001, CLT-0002)
+function generateClientCode(PDO $db): string {
+    try {
+        $stmt = $db->query("SELECT client_code FROM clients WHERE client_code LIKE 'CLT-%' ORDER BY id DESC LIMIT 100");
+        $maxNum = 0;
+        if ($stmt) {
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (preg_match('/CLT-(\d+)/i', $row['client_code'], $m)) {
+                    $num = (int)$m[1];
+                    if ($num > $maxNum) {
+                        $maxNum = $num;
+                    }
+                }
+            }
+        }
+        $nextNum = $maxNum + 1;
+        
+        do {
+            $code = 'CLT-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $check = $db->prepare("SELECT id FROM clients WHERE client_code = ?");
+            $check->execute([$code]);
+            if (!$check->fetch()) {
+                return $code;
+            }
+            $nextNum++;
+        } while (true);
+    } catch (\Throwable $e) {
+        return 'CLT-' . str_pad(time() % 10000, 4, '0', STR_PAD_LEFT);
     }
 }
 
