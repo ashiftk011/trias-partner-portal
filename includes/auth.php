@@ -218,13 +218,13 @@ function redirect(string $url): void {
 // Role display label
 function roleLabel(string $role): string {
     return match($role) {
-        'admin'    => '<span class="badge bg-danger">Admin</span>',
-        'finance'  => '<span class="badge bg-success">Finance</span>',
-        'accounts' => '<span class="badge text-white" style="background-color:#6f42c1;">Accounts</span>',
-        'telecall' => '<span class="badge bg-primary">Telecall</span>',
-        'investor' => '<span class="badge bg-warning text-dark">Investor</span>',
-        'csm'      => '<span class="badge bg-info text-dark">CSM</span>',
-        default    => '<span class="badge bg-secondary">' . htmlspecialchars($role) . '</span>',
+        'admin'    => '<span class="badge badge-soft-danger"><span class="badge-dot" style="background:#ef4444;"></span>Admin</span>',
+        'finance'  => '<span class="badge badge-soft-success"><span class="badge-dot" style="background:#22c55e;"></span>Finance</span>',
+        'accounts' => '<span class="badge" style="background:rgba(111,66,193,0.12); color:#6f42c1; border:1px solid rgba(111,66,193,0.2);"><span class="badge-dot" style="background:#6f42c1;"></span>Accounts</span>',
+        'telecall' => '<span class="badge badge-soft-primary"><span class="badge-dot" style="background:#6366f1;"></span>Telecall</span>',
+        'investor' => '<span class="badge badge-soft-warning"><span class="badge-dot" style="background:#f59e0b;"></span>Investor</span>',
+        'csm'      => '<span class="badge badge-soft-info"><span class="badge-dot" style="background:#0ea5e9;"></span>CSM</span>',
+        default    => '<span class="badge badge-soft-secondary"><span class="badge-dot" style="background:#64748b;"></span>' . htmlspecialchars($role) . '</span>',
     };
 }
 
@@ -250,5 +250,5 @@ function statusBadge(string $status): string {
     ];
     $cls = $map[$status] ?? 'secondary';
     $label = ucwords(str_replace('_', ' ', $status));
-    return "<span class='badge bg-{$cls}'>{$label}</span>";
+    return "<span class='badge badge-soft-{$cls}'><span class='badge-dot bg-{$cls}'></span>{$label}</span>";
 }

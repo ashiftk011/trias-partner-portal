@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('invoices');
 
 $db = getDB();
@@ -9,7 +10,7 @@ if (!$paymentId) redirect(BASE_URL . '/modules/invoices/index.php');
 
 $stmt = $db->prepare("
     SELECT py.*, u.name as by_name,
-           i.invoice_no, i.total_amount, i.paid_amount,
+           i.invoice_no, i.total_amount, i.paid_amount, i.advance_amount, i.advance_date, i.currency,
            c.name as client_name, c.company, c.email as client_email,
            c.phone as client_phone, c.address, c.city, c.state, c.gst_no
     FROM payments py
@@ -21,6 +22,22 @@ $stmt = $db->prepare("
 $stmt->execute([$paymentId]);
 $py = $stmt->fetch();
 if (!$py) redirect(BASE_URL . '/modules/invoices/index.php');
+
+// Calculate previous payments recorded before this payment for this invoice
+$priorStmt = $db->prepare("
+    SELECT COALESCE(SUM(amount), 0) 
+    FROM payments 
+    WHERE invoice_id = ? AND id < ?
+");
+$priorStmt->execute([$py['invoice_id'], $py['id']]);
+$previouslyPaid = (float)$priorStmt->fetchColumn();
+
+$thisPayment      = (float)$py['amount'];
+$advanceAmount    = (float)($py['advance_amount'] ?? 0);
+$totalPaidSoFar   = $advanceAmount + $previouslyPaid + $thisPayment;
+$balanceRemaining = max(0, (float)$py['total_amount'] - $totalPaidSoFar);
+$currencyCode     = $py['currency'] ?? 'INR';
+$currencySym      = currencySymbol($currencyCode);
 
 $companySettings = [];
 foreach ($db->query("SELECT setting_key, setting_value FROM app_settings")->fetchAll() as $row) {
@@ -107,7 +124,7 @@ include __DIR__ . '/../../includes/header.php';
           <!-- Amount Block -->
           <div class="rcp-amount-block">
             <div class="rcp-amount-label">Amount Received</div>
-            <div class="rcp-amount-value">₹<?= number_format($py['amount'], 2) ?></div>
+            <div class="rcp-amount-value"><?= htmlspecialchars($currencySym) ?><?= number_format($thisPayment, 2) ?></div>
           </div>
 
           <!-- Payment Details Table -->
@@ -122,19 +139,39 @@ include __DIR__ . '/../../includes/header.php';
               <td class="rcp-td-value"><?= htmlspecialchars($py['transaction_id']) ?></td>
             </tr>
             <?php endif; ?>
-            <tr>
-              <td class="rcp-td-label">Invoice Total</td>
-              <td class="rcp-td-value">₹<?= number_format($py['total_amount'], 2) ?></td>
+            <tr class="bg-light">
+              <td class="rcp-td-label fw-bold text-dark" style="font-size: 0.9rem;">Invoice Total</td>
+              <td class="rcp-td-value fw-bold text-dark" style="font-size: 0.95rem;"><?= htmlspecialchars($currencySym) ?><?= number_format($py['total_amount'], 2) ?></td>
             </tr>
+            <?php if ($advanceAmount > 0): ?>
             <tr>
-              <td class="rcp-td-label">Total Paid (incl. this)</td>
-              <td class="rcp-td-value">₹<?= number_format($py['paid_amount'], 2) ?></td>
+              <td class="rcp-td-label">Advance Paid</td>
+              <td class="rcp-td-value">
+                <?= htmlspecialchars($currencySym) ?><?= number_format($advanceAmount, 2) ?>
+                <?php if (!empty($py['advance_date'])): ?>
+                  <span class="text-muted small ms-1">(<?= date('d-M-Y', strtotime($py['advance_date'])) ?>)</span>
+                <?php endif; ?>
+              </td>
             </tr>
-            <?php $balance = $py['total_amount'] - $py['paid_amount']; ?>
+            <?php endif; ?>
+            <?php if ($previouslyPaid > 0): ?>
+            <tr>
+              <td class="rcp-td-label">Previously Paid</td>
+              <td class="rcp-td-value"><?= htmlspecialchars($currencySym) ?><?= number_format($previouslyPaid, 2) ?></td>
+            </tr>
+            <?php endif; ?>
+            <tr>
+              <td class="rcp-td-label">Amount Paid (This Receipt)</td>
+              <td class="rcp-td-value text-success fw-bold"><?= htmlspecialchars($currencySym) ?><?= number_format($thisPayment, 2) ?></td>
+            </tr>
+            <tr style="background-color: #eef2ff;">
+              <td class="rcp-td-label fw-bold text-primary" style="font-size: 0.9rem;">Total Paid (incl. this)</td>
+              <td class="rcp-td-value fw-bold text-primary" style="font-size: 0.95rem;"><?= htmlspecialchars($currencySym) ?><?= number_format($totalPaidSoFar, 2) ?></td>
+            </tr>
             <tr>
               <td class="rcp-td-label">Balance Remaining</td>
-              <td class="rcp-td-value <?= $balance > 0 ? 'text-danger' : 'text-success' ?>">
-                <?= $balance > 0 ? '₹' . number_format($balance, 2) : 'Fully Paid' ?>
+              <td class="rcp-td-value <?= $balanceRemaining > 0 ? 'text-danger' : 'text-success' ?>">
+                <?= $balanceRemaining > 0 ? htmlspecialchars($currencySym) . number_format($balanceRemaining, 2) : 'Fully Paid' ?>
               </td>
             </tr>
             <?php if ($py['notes']): ?>

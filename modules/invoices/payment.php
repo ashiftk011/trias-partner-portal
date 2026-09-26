@@ -12,7 +12,7 @@ $stmt->execute([$invoiceId]);
 $inv = $stmt->fetch();
 if (!$inv) redirect(BASE_URL . '/modules/invoices/index.php');
 
-$balance = $inv['total_amount'] - $inv['paid_amount'];
+$balance = max(0, (float)$inv['total_amount'] - (float)($inv['advance_amount'] ?? 0) - (float)$inv['paid_amount']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -33,8 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
        ->execute([$invoiceId,$inv['client_id'],$amount,$paymentDate,$paymentMode,$txnId,$notes,$userId]);
 
     // Update invoice paid amount + status
-    $newPaid = $inv['paid_amount'] + $amount;
-    if ($newPaid >= $inv['total_amount'] - 0.01) {
+    $newPaid = (float)$inv['paid_amount'] + $amount;
+    $advanceAmt = (float)($inv['advance_amount'] ?? 0);
+    if ($newPaid + $advanceAmt >= (float)$inv['total_amount'] - 0.01) {
         $newStatus = 'paid';
     } else {
         $newStatus = 'partial';

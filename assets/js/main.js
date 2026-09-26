@@ -39,7 +39,7 @@ $(document).ready(function () {
           pageLength: 25,
           language: {
             search: '',
-            searchPlaceholder: 'Search...',
+            searchPlaceholder: 'Search records...',
             lengthMenu: 'Show _MENU_ entries',
             info: 'Showing _START_ to _END_ of _TOTAL_ records',
             emptyTable: 'No records found',
@@ -66,11 +66,50 @@ $(document).ready(function () {
     });
   }
 
+  // ---- Global Search Input Handler ----
+  $('#globalSearchInput').on('keyup input', function () {
+    const term = $(this).val().toLowerCase();
+    if ($.fn.DataTable && $('table.datatable').length) {
+      $('table.datatable').DataTable().search(term).draw();
+    } else {
+      $('table tbody tr').each(function () {
+        const text = $(this).text().toLowerCase();
+        $(this).toggle(text.indexOf(term) > -1);
+      });
+    }
+  });
+
+  // ---- Stat Counter Animation ----
+  $('.stat-value').each(function () {
+    const $this = $(this);
+    const raw = $this.text().trim();
+    const match = raw.match(/([^\d]*)([\d,]+)(.*)/);
+    if (match) {
+      const prefix = match[1];
+      const val = parseInt(match[2].replace(/,/g, ''), 10);
+      const suffix = match[3];
+      if (!isNaN(val) && val > 0) {
+        $({ countNum: 0 }).animate({ countNum: val }, {
+          duration: 700,
+          easing: 'swing',
+          step: function () {
+            $this.text(prefix + Math.floor(this.countNum).toLocaleString() + suffix);
+          },
+          complete: function () {
+            $this.text(prefix + val.toLocaleString() + suffix);
+          }
+        });
+      }
+    }
+  });
+
   // ---- Auto-dismiss flash alerts ----
   setTimeout(() => {
     $('.alert.alert-success, .alert.alert-info').each(function () {
-      const alert = bootstrap.Alert.getOrCreateInstance(this);
-      if (alert) alert.close();
+      if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+        const alert = bootstrap.Alert.getOrCreateInstance(this);
+        if (alert) alert.close();
+      }
     });
   }, 4000);
 
@@ -83,29 +122,27 @@ $(document).ready(function () {
   });
 
   // ---- Tooltip init ----
-  $('[title]').tooltip({ trigger: 'hover', placement: 'top' });
+  if ($.fn.tooltip) {
+    $('[title]').tooltip({ trigger: 'hover', placement: 'top' });
+  }
 
   // ---- Reset modal forms on close ----
   $('.modal').on('hidden.bs.modal', function () {
     const form = $(this).find('form')[0];
     if (form) {
       form.reset();
-      // Reset hidden id fields to 0
       $(this).find('input[type="hidden"][name="id"]').val('0');
-      // Reset modal title
       const title = $(this).find('.modal-title');
       if (title.length) {
         const original = title.data('original');
         if (original) title.text(original);
       }
-      // Reset Select2
       if ($.fn.select2) {
         $(this).find('.select2').val('').trigger('change');
       }
     }
   });
 
-  // Store original modal titles
   $('.modal-title').each(function () {
     $(this).data('original', $(this).text());
   });

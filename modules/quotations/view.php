@@ -501,21 +501,46 @@ include __DIR__ . '/../../includes/header.php';
 /* ===== Print ===== */
 @media print {
   @page {
-    margin: 1mm;
+    margin: 8mm 10mm;
   }
   .sidebar, .top-navbar, #topNavbar, .no-print, .col-xl-4 { display: none !important; }
   .col-xl-9 { width: 100% !important; max-width: 100% !important; flex: 0 0 100% !important; }
-  .main-content { margin-left: 0 !important; }
+  .main-content { margin-left: 0 !important; margin-top: 0 !important; padding: 0 !important; }
   body { background: white !important; }
   .card { box-shadow: none !important; border: none !important; }
   .inv-content { padding: 5px 20px 20px 20px; }
-  .inv-body { overflow: visible !important; }
+  .inv-body { overflow: visible !important; min-height: auto !important; }
+
+  /* Multi-page splitting rules: total & footer on last page only */
+  .inv-table {
+    width: 100% !important;
+  }
+  .inv-table thead {
+    display: table-header-group;
+  }
+  .inv-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .inv-table tfoot {
+    display: table-row-group;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .inv-notes-section,
+  .inv-thankyou {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   .inv-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
+    position: relative !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    margin-top: 30px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .inv-watermark { opacity: 0.05 !important; }
   .inv-watermark img { max-width: 500px; max-height: 500px; }

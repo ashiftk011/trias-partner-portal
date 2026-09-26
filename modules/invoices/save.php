@@ -73,13 +73,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $taxAmount      = round($afterDiscount * $taxPercent / 100, 2);
     $totalAmount    = round($afterDiscount + $taxAmount, 2);
 
-    // Generate invoice number
-    $lastInv = $db->query("SELECT invoice_no FROM invoices ORDER BY id DESC LIMIT 1")->fetchColumn();
-    $lastNum = $lastInv ? (int)preg_replace('/\D/','',$lastInv) : 0;
-    $invoiceNo = 'INV-' . str_pad($lastNum+1, 5, '0', STR_PAD_LEFT);
+    // Determine initial status based on advance_amount
+    if ($advanceAmount >= $totalAmount - 0.01 && $totalAmount > 0) {
+        $initialStatus = 'paid';
+    } elseif ($advanceAmount > 0) {
+        $initialStatus = 'partial';
+    } else {
+        $initialStatus = 'pending';
+    }
 
-    $db->prepare("INSERT INTO invoices (invoice_no,client_id,renewal_id,invoice_date,due_date,subtotal,discount_type,discount_percent,discount_amount,tax_percent,tax_amount,total_amount,advance_amount,advance_date,paid_amount,status,notes,terms_conditions,currency,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'pending',?,?,?,?)")
-       ->execute([$invoiceNo,$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$notes,$termsConditions,$currency,$userId]);
+    $db->prepare("INSERT INTO invoices (invoice_no,client_id,renewal_id,invoice_date,due_date,subtotal,discount_type,discount_percent,discount_amount,tax_percent,tax_amount,total_amount,advance_amount,advance_date,paid_amount,status,notes,terms_conditions,currency,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)")
+       ->execute([$invoiceNo,$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$initialStatus,$notes,$termsConditions,$currency,$userId]);
 
     $newId = $db->lastInsertId();
 
