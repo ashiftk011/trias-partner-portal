@@ -126,14 +126,52 @@ CREATE TABLE clients (
     FOREIGN KEY (region_id) REFERENCES regions(id) ON DELETE SET NULL
 );
 
--- Client Settings (key-value store per client)
+-- Client Instances (multiple applications/instances per client)
+CREATE TABLE client_instances (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    instance_name VARCHAR(150) NOT NULL,
+    environment VARCHAR(50) DEFAULT 'Production',
+    status ENUM('active','inactive','maintenance') DEFAULT 'active',
+    is_default TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- Client Settings (key-value store per client instance)
 CREATE TABLE client_settings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     client_id INT NOT NULL,
+    instance_id INT NULL DEFAULT NULL,
     setting_key VARCHAR(100) NOT NULL,
     setting_value TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_client_setting (client_id, setting_key),
+    UNIQUE KEY unique_client_instance_setting (client_id, instance_id, setting_key),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES client_instances(id) ON DELETE CASCADE
+);
+
+-- Client Sites & Instances (multiple sites per client)
+CREATE TABLE client_sites (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    site_name VARCHAR(200) NOT NULL,
+    environment VARCHAR(50) DEFAULT 'Production',
+    site_url VARCHAR(255),
+    api_key VARCHAR(255),
+    api_integration_code VARCHAR(255),
+    hosting_server VARCHAR(255),
+    server_username VARCHAR(100),
+    server_password VARCHAR(100),
+    db_type VARCHAR(50) DEFAULT 'MySQL',
+    db_connection TEXT,
+    db_username VARCHAR(100),
+    db_password VARCHAR(100),
+    status ENUM('active','inactive','maintenance') DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
 
@@ -345,4 +383,91 @@ CREATE TABLE client_queries (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Employees (HR Portal)
+CREATE TABLE employees (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_number VARCHAR(30) UNIQUE NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NULL,
+    designation VARCHAR(100) NOT NULL,
+    department VARCHAR(100) DEFAULT 'General',
+    joining_date DATE NOT NULL,
+    status ENUM('active','inactive','resigned','terminated') DEFAULT 'active',
+    bank_name VARCHAR(100) NULL,
+    bank_account_no VARCHAR(50) NULL,
+    ifsc_code VARCHAR(20) NULL,
+    pan_no VARCHAR(20) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Employee Salary Structures
+CREATE TABLE salary_structures (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    employee_id INT UNIQUE NOT NULL,
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+);
+
+-- Salary Payments & Slips
+CREATE TABLE salary_payments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    slip_number VARCHAR(50) UNIQUE NOT NULL,
+    employee_id INT NOT NULL,
+    month INT NOT NULL,
+    year INT NOT NULL,
+    payment_date DATE NOT NULL,
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    gross_salary DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    total_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    payment_mode ENUM('bank_transfer','cheque','cash') DEFAULT 'bank_transfer',
+    transaction_ref VARCHAR(100) NULL,
+    status ENUM('draft','paid','cancelled') DEFAULT 'draft',
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_emp_month_year (employee_id, month, year),
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Salary Revisions & Increment History
+CREATE TABLE salary_revisions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    employee_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    revision_type ENUM('increment','revision','promotion','initial') DEFAULT 'increment',
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    notes VARCHAR(255) NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );

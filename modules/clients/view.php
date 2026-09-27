@@ -75,11 +75,18 @@ $queries = $db->prepare("SELECT cq.*, u.name as by_name FROM client_queries cq L
 $queries->execute([$id]);
 $queries = $queries->fetchAll();
 
-$existingSettings = [];
-$settingsResult = $db->prepare("SELECT setting_key, setting_value FROM client_settings WHERE client_id=?");
+// Fetch client instances
+$instStmt = $db->prepare("SELECT * FROM client_instances WHERE client_id=? ORDER BY is_default DESC, id ASC");
+$instStmt->execute([$id]);
+$clientInstances = $instStmt->fetchAll();
+
+// If no instance exists, default to empty array
+$instanceSettingsMap = [];
+$settingsResult = $db->prepare("SELECT instance_id, setting_key, setting_value FROM client_settings WHERE client_id=?");
 $settingsResult->execute([$id]);
 foreach ($settingsResult->fetchAll() as $row) {
-    $existingSettings[$row['setting_key']] = $row['setting_value'];
+    $instId = (int)($row['instance_id'] ?: 0);
+    $instanceSettingsMap[$instId][$row['setting_key']] = $row['setting_value'];
 }
 
 $pageTitle = 'Client: ' . $client['name'];
@@ -97,7 +104,7 @@ include __DIR__ . '/../../includes/header.php';
     <div class="dropdown">
       <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
       <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>"><i class="bi bi-gear me-2"></i>Settings</a></li>
+        <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>"><i class="bi bi-gear me-2"></i>Manage Settings & Instances</a></li>
         <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/renewals/index.php?client_id=<?= $id ?>"><i class="bi bi-arrow-repeat me-2"></i>Renewals</a></li>
         <?php if (hasAccess('invoices')): ?>
         <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/invoices/index.php?client_id=<?= $id ?>"><i class="bi bi-receipt me-2"></i>Invoices</a></li>
@@ -125,7 +132,7 @@ include __DIR__ . '/../../includes/header.php';
 <?php displayFlash(); ?>
 
 <div class="row g-4">
-  <!-- Client Details -->
+  <!-- Client Details & Instances -->
   <div class="col-xl-4">
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-person me-2 text-primary"></i>Client Details</div>
@@ -163,32 +170,50 @@ include __DIR__ . '/../../includes/header.php';
       </div>
     </div>
 
-    <?php if (!empty($existingSettings['plan_type']) || !empty($existingSettings['plan_start_date']) || !empty($existingSettings['api_integration_code']) || !empty($existingSettings['environment_name'])): ?>
+    <!-- Multi-Instance Summary Cards -->
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-box-seam me-2 text-primary"></i>Plan & Integration Details</span>
-        <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>" class="btn btn-sm btn-link p-0 text-decoration-none"><i class="bi bi-pencil"></i> Edit</a>
+        <span><i class="bi bi-cpu me-2 text-primary"></i>Configured Instances (<?= count($clientInstances) ?>)</span>
+        <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>" class="btn btn-sm btn-outline-primary py-0" style="font-size:0.75rem;"><i class="bi bi-plus"></i> Manage</a>
       </div>
-      <div class="card-body">
-        <?php
-        $planDetails = [
-          'Plan Type'              => $existingSettings['plan_type'] ?? '',
-          'Start Date'             => !empty($existingSettings['plan_start_date']) ? date('d M Y', strtotime($existingSettings['plan_start_date'])) : '',
-          'End Date'               => !empty($existingSettings['plan_end_date']) ? date('d M Y', strtotime($existingSettings['plan_end_date'])) : '',
-          'API Integration Code'   => $existingSettings['api_integration_code'] ?? '',
-          'Environment Name'       => $existingSettings['environment_name'] ?? '',
-        ];
-        foreach ($planDetails as $label => $value):
-          if (!$value) continue;
-        ?>
-        <div class="d-flex justify-content-between border-bottom py-2">
-          <span class="text-muted small"><?= $label ?></span>
-          <span class="fw-semibold small text-end"><?= htmlspecialchars($value) ?></span>
+      <div class="card-body p-0">
+        <?php if (!empty($clientInstances)): ?>
+        <div class="list-group list-group-flush">
+          <?php foreach ($clientInstances as $inst): 
+            $iId = (int)$inst['id'];
+            $iSettings = $instanceSettingsMap[$iId] ?? [];
+            $badgeColor = $inst['status'] === 'active' ? 'bg-success' : 'bg-secondary';
+          ?>
+          <div class="list-group-item p-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-semibold small text-dark">
+                <?php if ($inst['is_default']): ?><i class="bi bi-star-fill text-warning me-1"></i><?php endif; ?>
+                <?= htmlspecialchars($inst['instance_name']) ?>
+              </span>
+              <span class="badge <?= $badgeColor ?> font-monospace" style="font-size: 0.7rem;"><?= htmlspecialchars($inst['environment']) ?></span>
+            </div>
+            <div class="text-muted small mb-2">
+              <?php if (!empty($iSettings['domain'])): ?>
+                <div><i class="bi bi-globe me-1"></i><?= htmlspecialchars($iSettings['domain']) ?></div>
+              <?php endif; ?>
+              <?php if (!empty($iSettings['hosting_server'])): ?>
+                <div><i class="bi bi-hdd-rack me-1"></i><?= htmlspecialchars($iSettings['hosting_server']) ?></div>
+              <?php endif; ?>
+              <?php if (!empty($iSettings['db_type'])): ?>
+                <div><i class="bi bi-database me-1"></i>DB: <?= htmlspecialchars($iSettings['db_type']) ?></div>
+              <?php endif; ?>
+            </div>
+            <a href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>&instance_id=<?= $iId ?>" class="btn btn-sm btn-light border w-100 py-1" style="font-size: 0.75rem;">
+              <i class="bi bi-gear me-1"></i>Edit Instance Settings
+            </a>
+          </div>
+          <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
+        <?php else: ?>
+        <div class="text-muted small p-3 text-center">No instances created yet.</div>
+        <?php endif; ?>
       </div>
     </div>
-    <?php endif; ?>
   </div>
 
   <!-- Renewals + Invoices -->

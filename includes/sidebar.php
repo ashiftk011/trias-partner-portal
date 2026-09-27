@@ -31,6 +31,13 @@ $navSections = [
         ]
     ],
     [
+        'title' => 'HR & PAYROLL',
+        'items' => [
+            ['module'=>'hr', 'submodule'=>'employees', 'icon'=>'person-badge-fill','label'=>'Employees',   'url'=>BASE_URL.'/modules/hr/employees.php'],
+            ['module'=>'hr', 'submodule'=>'payroll',   'icon'=>'wallet2',          'label'=>'Salary & Slips','url'=>BASE_URL.'/modules/hr/payroll.php'],
+        ]
+    ],
+    [
         'title' => 'SYSTEM & CONFIG',
         'items' => [
             ['module'=>'users',     'icon'=>'person-gear',      'label'=>'Users',       'url'=>BASE_URL.'/modules/users/index.php'],
@@ -39,13 +46,43 @@ $navSections = [
     ]
 ];
 
+// Fetch dynamic portal branding & company details from app_settings
+$sidebarBrandName = APP_NAME;
+$sidebarBrandIcon = '';
+try {
+    $db = getDB();
+    $bStmt = $db->query("SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('app_name', 'app_icon', 'company_name', 'company_logo')");
+    $sMap = [];
+    while ($bRow = $bStmt->fetch()) {
+        $sMap[$bRow['setting_key']] = trim($bRow['setting_value']);
+    }
+
+    // App Name precedence: app_name -> company_name -> APP_NAME constant
+    if (!empty($sMap['app_name'])) {
+        $sidebarBrandName = $sMap['app_name'];
+    } elseif (!empty($sMap['company_name'])) {
+        $sidebarBrandName = $sMap['company_name'];
+    }
+
+    // App Icon precedence: app_icon -> company_logo -> default icon
+    if (!empty($sMap['app_icon'])) {
+        $sidebarBrandIcon = $sMap['app_icon'];
+    } elseif (!empty($sMap['company_logo'])) {
+        $sidebarBrandIcon = $sMap['company_logo'];
+    }
+} catch (Exception $e) {}
+
 ?>
 <nav id="sidebar" class="sidebar">
   <div class="sidebar-brand">
-    <div class="sidebar-brand-icon">
-      <i class="bi bi-diagram-3-fill"></i>
-    </div>
-    <span class="sidebar-brand-text"><?= APP_NAME ?></span>
+    <?php if (!empty($sidebarBrandIcon)): ?>
+      <img src="<?= BASE_URL . '/' . htmlspecialchars($sidebarBrandIcon) ?>" alt="App Icon" class="sidebar-brand-logo">
+    <?php else: ?>
+      <div class="sidebar-brand-icon">
+        <i class="bi bi-diagram-3-fill"></i>
+      </div>
+    <?php endif; ?>
+    <span class="sidebar-brand-text"><?= htmlspecialchars($sidebarBrandName) ?></span>
   </div>
 
   <?php foreach ($navSections as $section): ?>
@@ -62,10 +99,24 @@ $navSections = [
       <div class="sidebar-nav-section">
         <span class="sidebar-section-label"><?= $section['title'] ?></span>
       </div>
-      <ul class="nav flex-column sidebar-menu">
-        <?php foreach ($section['items'] as $item): ?>
+        <?php 
+          $currentPageScript = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
+          foreach ($section['items'] as $item): 
+        ?>
           <?php if (hasAccess($item['module'])): ?>
-            <?php $isActive = $activeModule === $item['module']; ?>
+            <?php 
+              if (isset($item['submodule'])) {
+                  if ($item['submodule'] === 'employees') {
+                      $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']) && !in_array($currentPageScript, ['payroll.php', 'payslip.php']);
+                  } elseif ($item['submodule'] === 'payroll') {
+                      $isActive = in_array($currentPageScript, ['payroll.php', 'payslip.php']);
+                  } else {
+                      $isActive = ($activeModule === $item['module']);
+                  }
+              } else {
+                  $isActive = ($activeModule === $item['module']);
+              }
+            ?>
             <li class="nav-item">
               <a href="<?= $item['url'] ?>"
                  class="sidebar-link <?= $isActive ? 'active' : '' ?>">
@@ -78,7 +129,6 @@ $navSections = [
             </li>
           <?php endif; ?>
         <?php endforeach; ?>
-      </ul>
     <?php endif; ?>
   <?php endforeach; ?>
 

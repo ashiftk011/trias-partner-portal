@@ -144,16 +144,30 @@ CREATE TABLE IF NOT EXISTS clients (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- 8. CLIENT SETTINGS (key-value store per client)
+-- 8. CLIENT INSTANCES & SETTINGS (multiple instances per client)
 -- ============================================================
+CREATE TABLE IF NOT EXISTS client_instances (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    instance_name VARCHAR(150) NOT NULL,
+    environment VARCHAR(50) DEFAULT 'Production',
+    status ENUM('active','inactive','maintenance') DEFAULT 'active',
+    is_default TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS client_settings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     client_id INT NOT NULL,
+    instance_id INT NULL DEFAULT NULL,
     setting_key VARCHAR(100) NOT NULL,
     setting_value TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_client_setting (client_id, setting_key),
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+    UNIQUE KEY unique_client_instance_setting (client_id, instance_id, setting_key),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    FOREIGN KEY (instance_id) REFERENCES client_instances(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -167,6 +181,31 @@ CREATE TABLE IF NOT EXISTS client_deployments (
     notes TEXT,
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 9b. CLIENT SITES & INSTANCES (multiple sites per client)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS client_sites (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    site_name VARCHAR(200) NOT NULL,
+    environment VARCHAR(50) DEFAULT 'Production',
+    site_url VARCHAR(255),
+    api_key VARCHAR(255),
+    api_integration_code VARCHAR(255),
+    hosting_server VARCHAR(255),
+    server_username VARCHAR(100),
+    server_password VARCHAR(100),
+    db_type VARCHAR(50) DEFAULT 'MySQL',
+    db_connection TEXT,
+    db_username VARCHAR(100),
+    db_password VARCHAR(100),
+    status ENUM('active','inactive','maintenance') DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -410,9 +449,6 @@ ALTER TABLE invoice_items MODIFY COLUMN description TEXT;
 
 -- Add terms_conditions column to invoices for live databases
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS terms_conditions TEXT NULL AFTER notes;
-ALTER TABLE quotations ADD discount DECIMAL(10,2) DEFAULT 0.00 AFTER subtotal;
-ALTER TABLE quotation_items ADD price_type ENUM('one_time', 'monthly', 'yearly') DEFAULT 'one_time' AFTER description
-
 -- Migration to add terms_conditions and discount to quotations
 ALTER TABLE quotations ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0.00 AFTER subtotal;
 ALTER TABLE quotations ADD COLUMN IF NOT EXISTS terms_conditions TEXT AFTER notes;
@@ -442,3 +478,126 @@ CREATE TABLE IF NOT EXISTS client_queries (
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 21. MULTI-INSTANCE CLIENT SETTINGS (FOR EXISTING DATABASES)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS client_instances (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    client_id INT NOT NULL,
+    instance_name VARCHAR(150) NOT NULL,
+    environment VARCHAR(50) DEFAULT 'Production',
+    status ENUM('active','inactive','maintenance') DEFAULT 'active',
+    is_default TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add instance_id to client_settings for existing databases
+ALTER TABLE client_settings ADD COLUMN IF NOT EXISTS instance_id INT NULL DEFAULT NULL AFTER client_id;
+
+-- Add unique constraint for multi-instance client settings
+ALTER TABLE client_settings ADD UNIQUE KEY IF NOT EXISTS unique_client_instance_setting (client_id, instance_id, setting_key);
+
+-- Create primary default instance for existing clients without instances
+INSERT INTO client_instances (client_id, instance_name, environment, status, is_default)
+SELECT id, 'Primary Instance', 'Production', 'active', 1 FROM clients
+WHERE id NOT IN (SELECT DISTINCT client_id FROM client_instances);
+
+-- Migrate unassociated settings to default instance
+UPDATE client_settings cs
+JOIN client_instances ci ON ci.client_id = cs.client_id AND ci.is_default = 1
+SET cs.instance_id = ci.id
+WHERE cs.instance_id IS NULL OR cs.instance_id = 0;
+
+-- ============================================================
+-- 22. HR PORTAL & PAYROLL TABLES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS employees (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_number VARCHAR(30) UNIQUE NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NULL,
+    designation VARCHAR(100) NOT NULL,
+    department VARCHAR(100) DEFAULT 'General',
+    joining_date DATE NOT NULL,
+    status ENUM('active','inactive','resigned','terminated') DEFAULT 'active',
+    bank_name VARCHAR(100) NULL,
+    bank_account_no VARCHAR(50) NULL,
+    ifsc_code VARCHAR(20) NULL,
+    pan_no VARCHAR(20) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS salary_structures (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    employee_id INT UNIQUE NOT NULL,
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS salary_payments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    slip_number VARCHAR(50) UNIQUE NOT NULL,
+    employee_id INT NOT NULL,
+    month INT NOT NULL,
+    year INT NOT NULL,
+    payment_date DATE NOT NULL,
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    gross_salary DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    total_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    payment_mode ENUM('bank_transfer','cheque','cash') DEFAULT 'bank_transfer',
+    transaction_ref VARCHAR(100) NULL,
+    status ENUM('draft','paid','cancelled') DEFAULT 'draft',
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_emp_month_year (employee_id, month, year),
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS salary_revisions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    employee_id INT NOT NULL,
+    effective_date DATE NOT NULL,
+    revision_type ENUM('increment','revision','promotion','initial') DEFAULT 'increment',
+    basic_salary DECIMAL(10,2) DEFAULT 0.00,
+    hra DECIMAL(10,2) DEFAULT 0.00,
+    conveyance DECIMAL(10,2) DEFAULT 0.00,
+    special_allowance DECIMAL(10,2) DEFAULT 0.00,
+    pf_deduction DECIMAL(10,2) DEFAULT 0.00,
+    tds_deduction DECIMAL(10,2) DEFAULT 0.00,
+    other_deductions DECIMAL(10,2) DEFAULT 0.00,
+    net_salary DECIMAL(10,2) DEFAULT 0.00,
+    notes VARCHAR(255) NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migration: Update salary_payments status ENUM for rollout workflow
+ALTER TABLE salary_payments MODIFY COLUMN status ENUM('draft','paid','cancelled') DEFAULT 'draft';
+INSERT INTO app_settings (setting_key, setting_value) VALUES ('payroll_email_notify', '1') ON DUPLICATE KEY UPDATE setting_key=setting_key;
+

@@ -73,15 +73,13 @@ if (hasAccess('invoices')) {
 }
 
 if (hasAccess('renewals') || hasAccess('clients')) {
-    // Fetch clients expiring soon (Hosting server expiry or Plan end date <= 15 days)
+    // Fetch clients expiring soon (Hosting server expiry or Plan end date <= 15 days across all instances)
     $sqlExp = "SELECT c.id, c.name as client_name, c.company, c.phone, p.name as project_name,
-                      cs_host.setting_value as hosting_expiry,
-                      cs_plan.setting_value as plan_setting_end_date,
+                      (SELECT MIN(setting_value) FROM client_settings WHERE client_id = c.id AND setting_key = 'hosting_expiry' AND setting_value IS NOT NULL AND setting_value != '') as hosting_expiry,
+                      (SELECT MIN(setting_value) FROM client_settings WHERE client_id = c.id AND setting_key = 'plan_end_date' AND setting_value IS NOT NULL AND setting_value != '') as plan_setting_end_date,
                       (SELECT end_date FROM renewals WHERE client_id = c.id AND status = 'active' ORDER BY end_date DESC LIMIT 1) as renewal_end_date
                FROM clients c
                LEFT JOIN projects p ON p.id = c.project_id
-               LEFT JOIN client_settings cs_host ON cs_host.client_id = c.id AND cs_host.setting_key = 'hosting_expiry'
-               LEFT JOIN client_settings cs_plan ON cs_plan.client_id = c.id AND cs_plan.setting_key = 'plan_end_date'
                WHERE c.status = 'active'";
 
     if ($isInvestor && $investorProjectId) {
