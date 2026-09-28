@@ -471,3 +471,32 @@ CREATE TABLE salary_revisions (
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Expense Categories
+CREATE TABLE expense_categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description VARCHAR(255) NULL,
+    color_code VARCHAR(20) DEFAULT '#0d6efd',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Expenses
+CREATE TABLE expenses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    category_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    vendor_name VARCHAR(150) NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    expense_date DATE NOT NULL,
+    payment_mode ENUM('bank_transfer','cash','upi','cheque','card','other') DEFAULT 'bank_transfer',
+    reference_no VARCHAR(100) NULL,
+    description TEXT NULL,
+    receipt_file VARCHAR(255) NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+

@@ -35,6 +35,13 @@ $(document).ready(function () {
   if ($.fn.DataTable) {
     $('table.datatable').each(function () {
       if (!$.fn.DataTable.isDataTable(this)) {
+        // If tbody contains a single colspan row (server-side empty placeholder),
+        // empty the tbody so DataTables initializes cleanly without column mismatch warning (TN/18)
+        const $tbody = $(this).find('tbody');
+        if ($tbody.children('tr').length === 1 && $tbody.find('td[colspan]').length === 1) {
+          $tbody.empty();
+        }
+
         $(this).DataTable({
           pageLength: 25,
           language: {

@@ -601,3 +601,45 @@ CREATE TABLE IF NOT EXISTS salary_revisions (
 ALTER TABLE salary_payments MODIFY COLUMN status ENUM('draft','paid','cancelled') DEFAULT 'draft';
 INSERT INTO app_settings (setting_key, setting_value) VALUES ('payroll_email_notify', '1') ON DUPLICATE KEY UPDATE setting_key=setting_key;
 
+-- Migration: Expense Management Tables & Categories
+CREATE TABLE IF NOT EXISTS expense_categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description VARCHAR(255) NULL,
+    color_code VARCHAR(20) DEFAULT '#0d6efd',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE expense_categories ADD COLUMN IF NOT EXISTS color_code VARCHAR(20) DEFAULT '#0d6efd' AFTER description;
+
+CREATE TABLE IF NOT EXISTS expenses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    category_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    vendor_name VARCHAR(150) NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    expense_date DATE NOT NULL,
+    payment_mode ENUM('bank_transfer','cash','upi','cheque','card','other') DEFAULT 'bank_transfer',
+    reference_no VARCHAR(100) NULL,
+    description TEXT NULL,
+    receipt_file VARCHAR(255) NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(150) NULL AFTER reference_no;
+
+INSERT INTO expense_categories (name, description, color_code) VALUES
+('Office Rent & Maintenance', 'Monthly office rent, electricity, water, and building maintenance', '#0d6efd'),
+('Software & Subscriptions', 'SaaS tools, cloud servers, domain registration, software licenses', '#6f42c1'),
+('Hardware & Equipment', 'Laptops, office computers, networking gear, office furniture', '#198754'),
+('Marketing & Advertising', 'Google Ads, Meta Ads, promotional materials, event sponsorships', '#fd7e14'),
+('Travel & Conveyance', 'Client visits, team travel, fuel, taxi, lodging expenses', '#0dcaf0'),
+('Utilities & Internet', 'Broadband internet, office landline, tea/coffee supplies', '#d63384'),
+('Professional & Legal Fees', 'Accounting, audit, legal consultations, tax filing fees', '#20c997'),
+('Miscellaneous Expenses', 'Other general operational expenditures', '#6c757d')
+ON DUPLICATE KEY UPDATE description=VALUES(description), color_code=VALUES(color_code);
+
+

@@ -25,6 +25,7 @@ $navSections = [
             ['module'=>'renewals',  'icon'=>'arrow-repeat',     'label'=>'Renewals',    'url'=>BASE_URL.'/modules/renewals/index.php'],
             ['module'=>'invoices',  'icon'=>'receipt',          'label'=>'Invoices',    'url'=>BASE_URL.'/modules/invoices/index.php'],
             ['module'=>'payments',  'icon'=>'cash-stack',       'label'=>'Payments Report','url'=>BASE_URL.'/modules/payments/index.php'],
+            ['module'=>'expenses',  'icon'=>'credit-card-2-front','label'=>'Company Expenses','url'=>BASE_URL.'/modules/expenses/index.php'],
             ['module'=>'projects',  'icon'=>'folder2-open',     'label'=>'Projects',    'url'=>BASE_URL.'/modules/projects/index.php'],
             ['module'=>'plans',     'icon'=>'clipboard-check',  'label'=>'Plans',       'url'=>BASE_URL.'/modules/plans/index.php'],
             ['module'=>'regions',   'icon'=>'geo-alt-fill',     'label'=>'Regions',     'url'=>BASE_URL.'/modules/regions/index.php'],

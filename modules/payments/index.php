@@ -74,6 +74,36 @@ $pStmt = $db->prepare($pSql);
 $pStmt->execute($pParams);
 $payrollPayments = $pStmt->fetchAll();
 
+// 3. Company Expenses Query (Outflows)
+$eSql = "SELECT ex.*, cat.name as category_name, cat.color_code as category_color, u.name as recorder_name
+         FROM expenses ex
+         LEFT JOIN expense_categories cat ON cat.id = ex.category_id
+         LEFT JOIN users u ON u.id = ex.created_by
+         WHERE 1=1";
+$eParams = [];
+
+if ($fromDate) {
+    $eSql .= " AND ex.expense_date >= ?";
+    $eParams[] = $fromDate;
+}
+if ($toDate) {
+    $eSql .= " AND ex.expense_date <= ?";
+    $eParams[] = $toDate;
+}
+if ($paymentMode) {
+    $eSql .= " AND ex.payment_mode = ?";
+    $eParams[] = $paymentMode;
+}
+if ($search) {
+    $eSql .= " AND (ex.title LIKE ? OR cat.name LIKE ? OR ex.reference_no LIKE ? OR ex.vendor_name LIKE ?)";
+    $eParams = array_merge($eParams, ["%$search%", "%$search%", "%$search%", "%$search%"]);
+}
+
+$eSql .= " ORDER BY ex.expense_date DESC, ex.id DESC";
+$eStmt = $db->prepare($eSql);
+$eStmt->execute($eParams);
+$expensePayments = $eStmt->fetchAll();
+
 // KPI Calculations
 $totalCount = count($payments);
 $totalAmount = 0;
@@ -88,20 +118,27 @@ foreach ($payrollPayments as $pp) {
     $totalPayrollAmount += (float)$pp['net_salary'];
 }
 
+$totalExpenseCount = count($expensePayments);
+$totalExpenseAmount = 0;
+foreach ($expensePayments as $ep) {
+    $totalExpenseAmount += (float)$ep['amount'];
+}
+
 $monthNames = [1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec'];
 
-$pageTitle = 'Payments Report';
+$pageTitle = 'Accounts & Payments Report';
 include __DIR__ . '/../../includes/header.php';
 ?>
 
 <div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
   <div>
-    <h4 class="mb-0">Payments Report</h4>
-    <p class="text-muted small mb-0">Track payment collections with custom date filters and CSV export</p>
+    <h4 class="mb-0">Accounts & Financial Ledger</h4>
+    <p class="text-muted small mb-0">Track client inflows, payroll disbursements, and company expense outflows</p>
   </div>
   <div>
     <?php
     $exportParams = http_build_query([
+        'tab'          => $activeTab,
         'from_date'    => $fromDate,
         'to_date'      => $toDate,
         'payment_mode' => $paymentMode,
@@ -128,15 +165,64 @@ include __DIR__ . '/../../includes/header.php';
   <li class="nav-item">
     <a href="?tab=payroll<?= $fromDate ? '&from_date='.$fromDate : '' ?><?= $toDate ? '&to_date='.$toDate : '' ?>"
        class="nav-link fw-semibold <?= $activeTab==='payroll'?'active':'' ?>">
-      <i class="bi bi-arrow-up-right-circle text-danger me-2"></i>Payroll Salary Disbursements (Outflows)
+      <i class="bi bi-arrow-up-right-circle text-danger me-2"></i>Payroll Disbursements (Outflows)
       <span class="badge bg-danger bg-opacity-10 text-danger ms-1"><?= count($payrollPayments) ?></span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a href="?tab=expenses<?= $fromDate ? '&from_date='.$fromDate : '' ?><?= $toDate ? '&to_date='.$toDate : '' ?>"
+       class="nav-link fw-semibold <?= $activeTab==='expenses'?'active':'' ?>">
+      <i class="bi bi-credit-card-2-front text-warning me-2"></i>Company Expenses (Outflows)
+      <span class="badge bg-warning bg-opacity-10 text-dark ms-1"><?= count($expensePayments) ?></span>
     </a>
   </li>
 </ul>
 
 <!-- Summary Cards -->
 <div class="row g-3 mb-4">
-  <?php if ($activeTab === 'payroll'): ?>
+  <?php if ($activeTab === 'expenses'): ?>
+    <div class="col-sm-6 col-xl-4">
+      <div class="card border-0 shadow-sm stat-card">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon rounded-3 bg-warning bg-opacity-10 text-dark">
+            <i class="bi bi-wallet2 fs-4"></i>
+          </div>
+          <div>
+            <div class="fs-4 fw-bold text-dark">₹<?= number_format($totalExpenseAmount, 2) ?></div>
+            <div class="text-muted small">Total Company Expenses</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-4">
+      <div class="card border-0 shadow-sm stat-card">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon rounded-3 bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-receipt-cutoff fs-4"></i>
+          </div>
+          <div>
+            <div class="fs-4 fw-bold text-primary"><?= number_format($totalExpenseCount) ?></div>
+            <div class="text-muted small">Recorded Expenses Count</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-4">
+      <div class="card border-0 shadow-sm stat-card">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon rounded-3 bg-info bg-opacity-10 text-info">
+            <i class="bi bi-plus-circle fs-4"></i>
+          </div>
+          <div>
+            <a href="<?= BASE_URL ?>/modules/expenses/index.php" class="btn btn-sm btn-outline-primary mt-1">
+              <i class="bi bi-gear me-1"></i>Manage Expenses & Categories
+            </a>
+            <div class="text-muted small mt-1">Add or edit recorded expenses</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <?php elseif ($activeTab === 'payroll'): ?>
     <div class="col-sm-6 col-xl-4">
       <div class="card border-0 shadow-sm stat-card">
         <div class="card-body d-flex align-items-center gap-3 py-3">
@@ -243,7 +329,7 @@ include __DIR__ . '/../../includes/header.php';
       </div>
       <div class="col-md-3">
         <label class="form-label small text-muted mb-1">Search</label>
-        <input type="text" name="q" class="form-control form-control-sm" placeholder="<?= $activeTab==='payroll'?'Slip no, employee name, UTR...':'Invoice no, client name, txn id...' ?>" value="<?= htmlspecialchars($search) ?>">
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="<?= $activeTab==='payroll'?'Slip no, employee name...':($activeTab==='expenses'?'Expense title, category, vendor...':'Invoice no, client name...') ?>" value="<?= htmlspecialchars($search) ?>">
       </div>
       <div class="col-md-1 d-flex gap-1">
         <button type="submit" class="btn btn-sm btn-primary w-100" title="Apply Filter"><i class="bi bi-filter"></i></button>
@@ -255,7 +341,75 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 </div>
 
-<?php if ($activeTab === 'payroll'): ?>
+<?php if ($activeTab === 'expenses'): ?>
+  <!-- Company Expenses Table (Accounts View) -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 datatable align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Expense Date</th>
+              <th>Title & Notes</th>
+              <th>Category</th>
+              <th>Vendor</th>
+              <th class="text-end">Amount</th>
+              <th>Payment Mode</th>
+              <th>Reference No</th>
+              <th>Recorded By</th>
+              <th class="text-center">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($expensePayments)): ?>
+            <tr>
+              <td colspan="10" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+                No company expense records found.
+              </td>
+            </tr>
+            <?php else: ?>
+            <?php foreach ($expensePayments as $idx => $ep): ?>
+            <tr>
+              <td><?= $idx + 1 ?></td>
+              <td class="small text-nowrap fw-semibold"><?= date('d M Y', strtotime($ep['expense_date'])) ?></td>
+              <td>
+                <div class="fw-bold text-dark"><?= htmlspecialchars($ep['title']) ?></div>
+                <?php if ($ep['description']): ?>
+                <div class="small text-muted text-truncate" style="max-width: 260px;" title="<?= htmlspecialchars($ep['description']) ?>">
+                  <?= htmlspecialchars($ep['description']) ?>
+                </div>
+                <?php endif; ?>
+              </td>
+              <td>
+                <span class="badge" style="background-color: <?= htmlspecialchars($ep['category_color'] ?: '#6c757d') ?>; color: #fff;">
+                  <?= htmlspecialchars($ep['category_name'] ?: 'Uncategorized') ?>
+                </span>
+              </td>
+              <td class="small"><?= htmlspecialchars($ep['vendor_name'] ?: '-') ?></td>
+              <td class="fw-bold text-danger text-end">₹<?= number_format($ep['amount'], 2) ?></td>
+              <td><span class="badge bg-light text-dark border"><?= strtoupper(str_replace('_',' ',$ep['payment_mode'])) ?></span></td>
+              <td><code class="text-dark"><?= htmlspecialchars($ep['reference_no'] ?: '-') ?></code></td>
+              <td class="small text-muted"><?= htmlspecialchars($ep['recorder_name'] ?: 'System') ?></td>
+              <td class="text-center">
+                <?php if (!empty($ep['receipt_file'])): ?>
+                <a href="<?= BASE_URL . '/' . htmlspecialchars($ep['receipt_file']) ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="View Attached Receipt">
+                  <i class="bi bi-paperclip me-1"></i>Receipt
+                </a>
+                <?php else: ?>
+                <span class="text-muted small">-</span>
+                <?php endif; ?>
+              </td>
+            </tr>
+            <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<?php elseif ($activeTab === 'payroll'): ?>
   <!-- Payroll Salary Disbursements Table (Accounts View) -->
   <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
@@ -386,3 +540,4 @@ include __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
+
