@@ -68,6 +68,7 @@ CREATE TABLE leads (
     address TEXT,
     source ENUM('website','referral','social_media','cold_call','email','exhibition','other') DEFAULT 'other',
     status ENUM('new','contacted','interested','not_interested','follow_up','converted','trial','trial_ended') DEFAULT 'new',
+    is_viewed TINYINT(1) DEFAULT 0,
     assigned_to INT,
     interested_plan_id INT,
     trial_end_date DATE NULL,

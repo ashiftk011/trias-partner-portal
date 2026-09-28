@@ -207,6 +207,7 @@ include __DIR__ . '/../../includes/header.php';
         </div>
       </div>
     </div>
+    <?php if (hasAccess('expenses')): ?>
     <div class="col-sm-6 col-xl-4">
       <div class="card border-0 shadow-sm stat-card">
         <div class="card-body d-flex align-items-center gap-3 py-3">
@@ -222,6 +223,21 @@ include __DIR__ . '/../../includes/header.php';
         </div>
       </div>
     </div>
+    <?php else: ?>
+    <div class="col-sm-6 col-xl-4">
+      <div class="card border-0 shadow-sm stat-card">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon rounded-3 bg-info bg-opacity-10 text-info">
+            <i class="bi bi-calculator fs-4"></i>
+          </div>
+          <div>
+            <div class="fs-4 fw-bold text-info">₹<?= number_format($totalExpenseCount > 0 ? ($totalExpenseAmount / $totalExpenseCount) : 0, 2) ?></div>
+            <div class="text-muted small">Average Expense Amount</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
   <?php elseif ($activeTab === 'payroll'): ?>
     <div class="col-sm-6 col-xl-4">
       <div class="card border-0 shadow-sm stat-card">

@@ -7,7 +7,21 @@ define('DB_CHARSET', 'utf8mb4');
 
 define('APP_NAME', 'Partner Portal');
 define('APP_VERSION', '1.0.0');
-define('BASE_URL', 'http://localhost:8181/TriasPartnerPortal');
+if (!defined('BASE_URL')) {
+    $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    if (($pos = strpos($scriptName, '/modules')) !== false) {
+        $baseDir = substr($scriptName, 0, $pos);
+    } elseif (($pos = strpos($scriptName, '/api')) !== false) {
+        $baseDir = substr($scriptName, 0, $pos);
+    } elseif (($pos = strpos($scriptName, '/scratch')) !== false) {
+        $baseDir = substr($scriptName, 0, $pos);
+    } else {
+        $baseDir = rtrim(dirname($scriptName), '/\\');
+    }
+    define('BASE_URL', rtrim($scheme . '://' . $host . $baseDir, '/'));
+}
 
 // Global Exception Handler to capture unhandled errors and prevent blank 500 screens
 set_exception_handler(function (\Throwable $e) {

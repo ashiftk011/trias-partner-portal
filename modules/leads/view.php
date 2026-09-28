@@ -12,6 +12,12 @@ $stmt->execute([$id]);
 $lead = $stmt->fetch();
 if (!$lead) { redirect(BASE_URL . '/modules/leads/index.php'); }
 
+// Mark lead as viewed
+if (empty($lead['is_viewed'])) {
+    $db->prepare("UPDATE leads SET is_viewed = 1 WHERE id = ?")->execute([$id]);
+    $lead['is_viewed'] = 1;
+}
+
 $isAdmin = isRole('admin');
 $canDelete = $isAdmin && $lead['status'] === 'not_interested';
 

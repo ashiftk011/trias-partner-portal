@@ -107,12 +107,16 @@ try {
           <?php if (hasAccess($item['module'])): ?>
             <?php 
               if (isset($item['submodule'])) {
-                  if ($item['submodule'] === 'employees') {
-                      $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']) && !in_array($currentPageScript, ['payroll.php', 'payslip.php']);
-                  } elseif ($item['submodule'] === 'payroll') {
-                      $isActive = in_array($currentPageScript, ['payroll.php', 'payslip.php']);
+                  if ($activeModule === $item['module']) {
+                      if ($item['submodule'] === 'employees') {
+                          $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']);
+                      } elseif ($item['submodule'] === 'payroll') {
+                          $isActive = in_array($currentPageScript, ['payroll.php', 'payslip.php']);
+                      } else {
+                          $isActive = true;
+                      }
                   } else {
-                      $isActive = ($activeModule === $item['module']);
+                      $isActive = false;
                   }
               } else {
                   $isActive = ($activeModule === $item['module']);

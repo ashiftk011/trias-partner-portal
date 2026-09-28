@@ -23,6 +23,7 @@ if ($isInvestor) {
 }
 $filterStatus  = $_GET['status'] ?? '';
 $filterRegion  = isset($_GET['region_id']) ? (int)$_GET['region_id'] : 0;
+$filterSource  = $_GET['source'] ?? '';
 $filterSearch  = trim($_GET['q'] ?? '');
 
 $sql = "SELECT l.*, p.name as project_name, r.name as region_name, u.name as assigned_name
@@ -45,11 +46,24 @@ if ($isTelecall && $telecallProjectIds) {
 if ($filterProject) { $sql .= " AND l.project_id=?"; $params[] = $filterProject; }
 if ($filterStatus)  { $sql .= " AND l.status=?";     $params[] = $filterStatus; }
 if ($filterRegion)  { $sql .= " AND l.region_id=?";  $params[] = $filterRegion; }
+if ($filterSource)  { $sql .= " AND l.source=?";     $params[] = $filterSource; }
 if ($filterSearch)  { $sql .= " AND (l.name LIKE ? OR l.phone LIKE ? OR l.company LIKE ?)"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; }
 
 $sql .= " ORDER BY l.created_at DESC";
 $stmt = $db->prepare($sql); $stmt->execute($params);
 $leads = $stmt->fetchAll();
+
+// Calculate Instagram & Social Media Leads count
+$instaCount = 0;
+$instaNewCount = 0;
+foreach ($leads as $l) {
+    if ($l['source'] === 'social_media') {
+        $instaCount++;
+        if (empty($l['is_viewed']) && $l['status'] === 'new') {
+            $instaNewCount++;
+        }
+    }
+}
 
 // Projects: telecall sees only their assigned projects; investors see only theirs
 if ($isTelecall && $telecallProjectIds) {
@@ -87,9 +101,12 @@ include __DIR__ . '/../../includes/header.php';
 ?>
 
 <div class="page-header d-flex justify-content-between align-items-center mb-3">
-  <div><h4 class="mb-0">Leads</h4><p class="text-muted small mb-0">Track and manage all leads</p></div>
+  <div><h4 class="mb-0">Leads Management</h4><p class="text-muted small mb-0">Track and manage all client leads with automated Instagram sync</p></div>
   <?php if (!$isInvestor): ?>
   <div class="d-flex gap-2">
+    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#instagramModal">
+      <i class="bi bi-instagram me-1"></i>Instagram Auto-Sync
+    </button>
     <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#csvModal">
       <i class="bi bi-file-earmark-arrow-up me-1"></i>Import CSV
     </button>
@@ -101,6 +118,85 @@ include __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php displayFlash(); ?>
+
+<!-- KPI Summary Cards for Leads -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="stat-icon rounded-3 bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-people-fill fs-4"></i>
+        </div>
+        <div>
+          <div class="fs-4 fw-bold text-dark"><?= number_format(count($leads)) ?></div>
+          <div class="text-muted small">Total Leads</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="stat-icon rounded-3 bg-warning bg-opacity-10 text-warning">
+          <i class="bi bi-star-fill fs-4"></i>
+        </div>
+        <div>
+          <div class="fs-4 fw-bold text-warning"><?= number_format($counts['new'] ?? 0) ?></div>
+          <div class="text-muted small">New Uncontacted</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="?source=social_media" class="text-decoration-none">
+      <div class="card border-0 shadow-sm stat-card h-100" style="border-left: 4px solid #dc2743 !important;">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon rounded-3 text-white" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
+            <i class="bi bi-instagram fs-4"></i>
+          </div>
+          <div>
+            <div class="fs-4 fw-bold text-dark d-flex align-items-center gap-1">
+              <?= number_format($instaCount) ?>
+              <?php if ($instaNewCount > 0): ?>
+                <span class="badge bg-danger rounded-pill fs-7"><?= $instaNewCount ?> new</span>
+              <?php endif; ?>
+            </div>
+            <div class="text-muted small">Instagram & Social Leads</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card">
+      <div class="card-body d-flex align-items-center gap-3 py-3">
+        <div class="stat-icon rounded-3 bg-success bg-opacity-10 text-success">
+          <i class="bi bi-check-circle-fill fs-4"></i>
+        </div>
+        <div>
+          <div class="fs-4 fw-bold text-success"><?= number_format($counts['converted'] ?? 0) ?></div>
+          <div class="text-muted small">Converted Clients</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Instagram Leads Notification Banner -->
+<?php if ($instaNewCount > 0): ?>
+<div class="alert border-0 shadow-sm text-white d-flex flex-wrap justify-content-between align-items-center mb-3 py-2 px-3" style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); border-radius: 10px;">
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-instagram fs-4"></i>
+    <div>
+      <strong class="d-block fs-6"><?= $instaNewCount ?> New Instagram Lead<?= $instaNewCount > 1 ? 's' : '' ?> Received!</strong>
+      <span class="small opacity-90">Captured automatically via Instagram & Meta Lead Ads Webhook</span>
+    </div>
+  </div>
+  <a href="?source=social_media&status=new" class="btn btn-sm btn-light text-dark fw-bold shadow-sm">
+    <i class="bi bi-eye me-1"></i>View New Instagram Leads (<?= $instaNewCount ?>)
+  </a>
+</div>
+<?php endif; ?>
 
 <!-- Status Summary Pills -->
 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -116,12 +212,17 @@ include __DIR__ . '/../../includes/header.php';
     'converted'      => 'success'
   ];
   foreach ($statusColors as $st => $cls): ?>
-  <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?>" class="badge bg-<?= $cls ?> text-decoration-none p-2 fs-6">
+  <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?><?= $filterSource?"&source=$filterSource":'' ?>" class="badge bg-<?= $cls ?> text-decoration-none p-2 fs-6">
     <?= ucwords(str_replace('_',' ',$st)) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
-  <?php if ($filterStatus || $filterProject || $filterRegion || $filterSearch): ?>
-  <a href="<?= BASE_URL ?>/modules/leads/index.php" class="badge bg-light text-dark text-decoration-none p-2 fs-6">
+  <?php if ($filterSource): ?>
+  <a href="?source=<?= urlencode($filterSource) ?>" class="badge text-white text-decoration-none p-2 fs-6 shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
+    <i class="bi bi-instagram me-1"></i>Source: <?= htmlspecialchars($filterSource) ?>
+  </a>
+  <?php endif; ?>
+  <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
+  <a href="<?= BASE_URL ?>/modules/leads/index.php" class="badge bg-light text-dark text-decoration-none p-2 fs-6 border">
     <i class="bi bi-x-circle me-1"></i>Clear Filters
   </a>
   <?php endif; ?>
@@ -156,6 +257,18 @@ include __DIR__ . '/../../includes/header.php';
           <?php foreach ($regions as $r): ?>
           <option value="<?= $r['id'] ?>" <?= $filterRegion==$r['id']?'selected':'' ?>><?= htmlspecialchars($r['name']) ?></option>
           <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="source" class="form-select form-select-sm">
+          <option value="">All Sources</option>
+          <option value="social_media" <?= $filterSource==='social_media'?'selected':'' ?>>Instagram / Social</option>
+          <option value="website" <?= $filterSource==='website'?'selected':'' ?>>Website</option>
+          <option value="referral" <?= $filterSource==='referral'?'selected':'' ?>>Referral</option>
+          <option value="cold_call" <?= $filterSource==='cold_call'?'selected':'' ?>>Cold Call</option>
+          <option value="email" <?= $filterSource==='email'?'selected':'' ?>>Email</option>
+          <option value="exhibition" <?= $filterSource==='exhibition'?'selected':'' ?>>Exhibition</option>
+          <option value="other" <?= $filterSource==='other'?'selected':'' ?>>Other</option>
         </select>
       </div>
       <div class="col-md-2">
@@ -200,7 +313,7 @@ include __DIR__ . '/../../includes/header.php';
 <div class="card border-0 shadow-sm">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0 datatable">
+      <table class="table table-hover mb-0 datatable align-middle">
         <thead class="table-light">
           <tr>
             <?php if ($isAdmin): ?>
@@ -211,8 +324,11 @@ include __DIR__ . '/../../includes/header.php';
             <th>Code</th><th>Lead</th><th>Contact</th><th>Project</th><th>Region</th><th>Source</th><th>Status</th><th>Assigned</th><th>Date</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          <?php foreach ($leads as $l): ?>
-          <tr>
+          <?php foreach ($leads as $l): 
+            $isAdLead = ($l['source'] === 'social_media');
+            $isUnviewedAdLead = ($isAdLead && empty($l['is_viewed']) && $l['status'] === 'new');
+          ?>
+          <tr class="<?= $isUnviewedAdLead ? 'table-danger bg-opacity-10 border-start border-4 border-danger' : '' ?>">
             <?php if ($isAdmin): ?>
             <td class="text-center">
               <?php if ($l['status'] === 'not_interested'): ?>
@@ -222,25 +338,40 @@ include __DIR__ . '/../../includes/header.php';
               <?php endif; ?>
             </td>
             <?php endif; ?>
-            <td><small class="text-muted"><?= htmlspecialchars($l['lead_code'] ?? '') ?></small></td>
             <td>
-              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="fw-semibold text-decoration-none">
+              <small class="text-muted font-monospace"><?= htmlspecialchars($l['lead_code'] ?? '') ?></small>
+            </td>
+            <td>
+              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="fw-semibold text-decoration-none text-dark">
                 <?= htmlspecialchars($l['name']) ?>
               </a>
+              <?php if ($isUnviewedAdLead): ?>
+                <span class="badge ms-1 shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); color: #fff; font-size: 0.65rem;">
+                  <i class="bi bi-star-fill me-1"></i>New Ad Lead
+                </span>
+              <?php endif; ?>
               <?php if ($l['company']): ?>
-              <div class="text-muted small"><i class="bi bi-building"></i> <?= htmlspecialchars($l['company']) ?></div>
+              <div class="text-muted small"><i class="bi bi-building me-1"></i><?= htmlspecialchars($l['company']) ?></div>
               <?php endif; ?>
             </td>
             <td>
               <div><?= htmlspecialchars($l['phone']) ?></div>
               <?php if ($l['email']): ?><small class="text-muted"><?= htmlspecialchars($l['email']) ?></small><?php endif; ?>
             </td>
-            <td><span class="badge bg-primary"><?= htmlspecialchars($l['project_name'] ?? '') ?></span></td>
+            <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($l['project_name'] ?? '') ?></span></td>
             <td><?= $l['region_name'] ? htmlspecialchars($l['region_name']) : '<span class="text-muted">-</span>' ?></td>
-            <td><small><?= ucfirst(str_replace('_',' ',$l['source'])) ?></small></td>
+            <td>
+              <?php if ($isAdLead): ?>
+                <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff;">
+                  <i class="bi bi-instagram me-1"></i>Instagram
+                </span>
+              <?php else: ?>
+                <span class="badge bg-light text-dark border"><?= ucfirst(str_replace('_',' ',$l['source'])) ?></span>
+              <?php endif; ?>
+            </td>
             <td><?= statusBadge($l['status']) ?></td>
             <td class="small"><?= htmlspecialchars($l['assigned_name'] ?? '-') ?></td>
-            <td class="text-muted small"><?= date('d M Y', strtotime($l['created_at'])) ?></td>
+            <td class="text-muted small text-nowrap"><?= date('d M Y', strtotime($l['created_at'])) ?></td>
             <td>
               <div class="btn-group btn-group-sm">
                 <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
@@ -436,6 +567,112 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 </div>
 
+<!-- Modal: Instagram & Meta Leads Automation -->
+<div class="modal fade" id="instagramModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-gradient text-white py-3" style="background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);">
+        <h5 class="modal-title fw-bold mb-0">
+          <i class="bi bi-instagram me-2"></i>Instagram & Meta Lead Ads Auto-Sync
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-3 mb-4">
+          <i class="bi bi-lightning-charge-fill fs-2 text-primary"></i>
+          <div>
+            <strong class="d-block text-dark">Automated Instant Lead Capture</strong>
+            Connect Instagram Ads & Facebook Lead Forms to automatically import leads into this portal as soon as prospects submit your ad forms!
+          </div>
+        </div>
+
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-link-45deg me-1 text-danger"></i>Your Webhook Integration Endpoint</h6>
+        <div class="input-group mb-4">
+          <input type="text" class="form-control font-monospace bg-light" id="instaWebhookUrl" value="<?= BASE_URL ?>/api/webhooks/instagram_lead.php" readonly>
+          <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('instaWebhookUrl').value); alert('Webhook URL copied to clipboard!');">
+            <i class="bi bi-clipboard me-1"></i>Copy URL
+          </button>
+        </div>
+
+        <ul class="nav nav-pills mb-3" id="instaPillsTab" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active py-1.5 px-3 small fw-semibold" id="pills-zapier-tab" data-bs-toggle="pill" data-bs-target="#pills-zapier" type="button">Zapier / Make / Pabbly</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link py-1.5 px-3 small fw-semibold" id="pills-meta-tab" data-bs-toggle="pill" data-bs-target="#pills-meta" type="button">Meta Developer Webhook</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link py-1.5 px-3 small fw-semibold" id="pills-test-tab" data-bs-toggle="pill" data-bs-target="#pills-test" type="button">Test Webhook Live</button>
+          </li>
+        </ul>
+
+        <div class="tab-content border rounded p-3 bg-light" id="instaPillsTabContent">
+          <!-- Zapier / Make / Pabbly Guide -->
+          <div class="tab-pane fade show active" id="pills-zapier">
+            <ol class="small mb-0 ps-3">
+              <li class="mb-2">Create a new Zap in <strong>Zapier</strong> or Scenario in <strong>Make.com</strong> / <strong>Pabbly</strong> with trigger <em>"New Lead in Facebook / Instagram Lead Ads"</em>.</li>
+              <li class="mb-2">Add an Action step: <strong>Webhook / Custom Request (POST)</strong> to URL: <code><?= BASE_URL ?>/api/webhooks/instagram_lead.php</code></li>
+              <li class="mb-2">Set Payload Type to <code>JSON</code> and map fields:
+                <ul class="mt-1">
+                  <li><code>full_name</code> &rarr; Lead Full Name</li>
+                  <li><code>phone_number</code> &rarr; Lead Phone</li>
+                  <li><code>email</code> &rarr; Lead Email</li>
+                  <li><code>company_name</code> &rarr; Company / Business Name</li>
+                  <li><code>form_name</code> &rarr; Campaign / Ad Form Name</li>
+                  <li><code>source</code> &rarr; <code>social_media</code></li>
+                </ul>
+              </li>
+              <li>Test the Zap! Leads will stream into your portal instantly.</li>
+            </ol>
+          </div>
+
+          <!-- Meta Webhook Guide -->
+          <div class="tab-pane fade" id="pills-meta">
+            <p class="small text-muted mb-2">For direct integration with Meta Developer App Webhooks:</p>
+            <ul class="small mb-0 ps-3">
+              <li class="mb-2">Set Webhook Callback URL: <code><?= BASE_URL ?>/api/webhooks/instagram_lead.php</code></li>
+              <li class="mb-2">Supports Meta <code>hub.challenge</code> verification automatically for subscription handshakes.</li>
+              <li>Receives lead payloads with <code>source = 'social_media'</code>.</li>
+            </ul>
+          </div>
+
+          <!-- Live Test Webhook Form -->
+          <div class="tab-pane fade" id="pills-test">
+            <form id="instaTestForm" method="POST" action="<?= BASE_URL ?>/api/webhooks/instagram_lead.php" target="_blank">
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small mb-1 fw-semibold">Full Name</label>
+                  <input type="text" name="full_name" class="form-control form-control-sm" value="Sample Instagram Lead" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small mb-1 fw-semibold">Phone Number</label>
+                  <input type="text" name="phone_number" class="form-control form-control-sm" value="9876543210" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small mb-1 fw-semibold">Email Address</label>
+                  <input type="email" name="email" class="form-control form-control-sm" value="insta.lead@example.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small mb-1 fw-semibold">Ad / Campaign Name</label>
+                  <input type="text" name="form_name" class="form-control form-control-sm" value="Instagram Promo Ad 2026">
+                </div>
+                <div class="col-12 mt-3">
+                  <button type="submit" class="btn btn-sm btn-danger">
+                    <i class="bi bi-send me-1"></i>Simulate Incoming Instagram Lead
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const allPlans = <?= json_encode($db->query("SELECT id,project_id,name,price FROM plans WHERE status='active' ORDER BY name")->fetchAll()) ?>;
 
@@ -553,6 +790,43 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('leadModalTitle').textContent = 'Add Lead';
       $('#lStatus').trigger('change');
     }
+  });
+
+  // Handle Instagram test webhook simulation form submit via AJAX
+  $('#instaTestForm').on('submit', function(e) {
+    e.preventDefault();
+    const $btn = $(this).find('button[type="submit"]');
+    const origHtml = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Processing Webhook...');
+
+    const payload = {
+      full_name: $(this).find('[name="full_name"]').val(),
+      phone_number: $(this).find('[name="phone_number"]').val(),
+      email: $(this).find('[name="email"]').val(),
+      form_name: $(this).find('[name="form_name"]').val(),
+      source: 'social_media'
+    };
+
+    $.ajax({
+      url: '<?= BASE_URL ?>/api/webhooks/instagram_lead.php',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify(payload),
+      success: function(res) {
+        $btn.prop('disabled', false).html(origHtml);
+        if (res && res.success) {
+          alert('SUCCESS! Instagram lead captured automatically.\n\nLead Code: ' + res.lead_code + '\nName: ' + res.name);
+          window.location.reload();
+        } else {
+          alert('Error: ' + (res.message || 'Unknown response from webhook.'));
+        }
+      },
+      error: function(xhr) {
+        $btn.prop('disabled', false).html(origHtml);
+        const msg = xhr.responseJSON ? xhr.responseJSON.message : (xhr.responseText || 'Connection failed.');
+        alert('Webhook Error: ' + msg);
+      }
+    });
   });
 
   $('#lProject').on('change', function() { loadPlans(this.value); });

@@ -642,4 +642,4 @@ INSERT INTO expense_categories (name, description, color_code) VALUES
 ('Miscellaneous Expenses', 'Other general operational expenditures', '#6c757d')
 ON DUPLICATE KEY UPDATE description=VALUES(description), color_code=VALUES(color_code);
 
-
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_viewed TINYINT(1) DEFAULT 0 AFTER status;
