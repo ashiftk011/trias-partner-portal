@@ -330,7 +330,19 @@ include __DIR__ . '/../../includes/header.php';
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-cash-stack me-2 text-success"></i>Payments</div>
       <div class="card-body p-0">
-        <?php if ($payments): ?>
+        <?php $advanceAmt = (float)($inv['advance_amount'] ?? 0); ?>
+        <?php if ($payments || $advanceAmt > 0): ?>
+
+        <?php if ($advanceAmt > 0): ?>
+        <div class="border-bottom p-3 bg-light-subtle">
+          <div class="d-flex justify-content-between align-items-start">
+            <span class="fw-semibold text-primary"><?= htmlspecialchars($currencySym) ?><?= number_format($advanceAmt, 2) ?></span>
+            <small class="text-muted"><?= !empty($inv['advance_date']) ? date('d M Y', strtotime($inv['advance_date'])) : date('d M Y', strtotime($inv['invoice_date'])) ?></small>
+          </div>
+          <div class="small text-muted"><span class="badge bg-primary me-1">Advance Paid</span></div>
+        </div>
+        <?php endif; ?>
+
         <?php foreach ($payments as $py): ?>
         <div class="border-bottom p-3">
           <div class="d-flex justify-content-between align-items-start">
@@ -347,10 +359,31 @@ include __DIR__ . '/../../includes/header.php';
           <?php if ($py['notes']): ?><div class="small text-muted"><?= htmlspecialchars($py['notes']) ?></div><?php endif; ?>
         </div>
         <?php endforeach; ?>
+
+        <?php if ($advanceAmt > 0): ?>
+        <div class="p-3 bg-light">
+          <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>Advance Paid:</span>
+            <span class="fw-semibold text-primary"><?= htmlspecialchars($currencySym) ?><?= number_format($advanceAmt, 2) ?></span>
+          </div>
+          <?php if (!empty($payments)): ?>
+          <div class="d-flex justify-content-between small text-muted mb-1">
+            <span>Further Payments:</span>
+            <span class="fw-semibold text-success"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['paid_amount'], 2) ?></span>
+          </div>
+          <?php endif; ?>
+          <div class="d-flex justify-content-between fw-semibold border-top pt-2 mt-1">
+            <span>Total Paid:</span>
+            <span class="text-success"><?= htmlspecialchars($currencySym) ?><?= number_format($advanceAmt + (float)$inv['paid_amount'], 2) ?></span>
+          </div>
+        </div>
+        <?php else: ?>
         <div class="p-3 bg-light d-flex justify-content-between fw-semibold">
           <span>Total Paid:</span>
           <span class="text-success"><?= htmlspecialchars($currencySym) ?><?= number_format($inv['paid_amount'],2) ?></span>
         </div>
+        <?php endif; ?>
+
         <?php else: ?>
         <div class="text-center text-muted py-4 small"><i class="bi bi-cash d-block fs-3 mb-2"></i>No payments recorded</div>
         <?php endif; ?>

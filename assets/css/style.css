@@ -528,11 +528,15 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
    ============================================================ */
 .table-responsive {
   border-radius: inherit;
-  overflow-x: auto;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
 }
 
 .card-body.p-0 {
-  overflow: hidden;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
   border-bottom-left-radius: inherit;
   border-bottom-right-radius: inherit;
 }
@@ -542,6 +546,16 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+/* Ensure table readable width on smaller screens */
+@media (max-width: 991.98px) {
+  .table:not(.table-sm) {
+    min-width: 650px;
+  }
+  .inv-table, .rcp-table, #itemsTable {
+    min-width: 600px;
+  }
 }
 
 .table thead th {
@@ -610,11 +624,23 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
 div.dataTables_wrapper {
   padding: 0;
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 div.dataTables_wrapper .row {
   margin-left: 0;
   margin-right: 0;
+}
+
+/* Allow table row container in DataTables to scroll horizontally if needed */
+div.dataTables_wrapper > .row:nth-child(2),
+div.dataTables_wrapper .dataTables_scrollBody,
+div.dataTables_wrapper .col-sm-12 {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
 
 div.dataTables_wrapper .row:first-child {

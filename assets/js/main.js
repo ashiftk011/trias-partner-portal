@@ -31,6 +31,13 @@ $(document).ready(function () {
     });
   }
 
+  // ---- Auto-wrap tables for mobile responsiveness ----
+  $('table.table, table.inv-table, table.rcp-table').each(function () {
+    if (!$(this).parent().hasClass('table-responsive')) {
+      $(this).wrap('<div class="table-responsive"></div>');
+    }
+  });
+
   // ---- DataTables Init ----
   if ($.fn.DataTable) {
     $('table.datatable').each(function () {

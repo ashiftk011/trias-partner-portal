@@ -79,7 +79,8 @@ include __DIR__ . '/../../includes/header.php';
   <div class="col-xl-8">
     <div class="card border-0 shadow-sm">
       <div class="card-body p-0">
-        <table class="table table-hover mb-0 datatable">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 datatable">
           <thead class="table-light">
             <tr><th>Region Name</th><th>Leads</th><th>Clients</th><th>Status</th><th>Actions</th></tr>
           </thead>
@@ -123,6 +124,7 @@ include __DIR__ . '/../../includes/header.php';
             <?php endforeach; ?>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
