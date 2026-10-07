@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/accounting.php';
 requireAccess('hr');
 
 $db = getDB();
@@ -21,9 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 1. ROLL OUT SALARY SLIPS (Single or Month Bulk)
     if ($action === 'rollout') {
-        $slipId = (int)($_POST['slip_id'] ?? 0);
-        $month  = (int)($_POST['rollout_month'] ?? 0);
-        $year   = (int)($_POST['rollout_year'] ?? 0);
+        $slipId    = (int)($_POST['slip_id'] ?? 0);
+        $month     = (int)($_POST['rollout_month'] ?? 0);
+        $year      = (int)($_POST['rollout_year'] ?? 0);
+        $accountId = (int)($_POST['account_id'] ?? 0);
 
         $slipsToRollout = [];
         if ($slipId > 0) {
@@ -47,10 +49,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $rolledCount = 0;
         $emailsSent = 0;
+        $monthNames = [1=>'January',2=>'February',3=>'March',4=>'April',5=>'May',6=>'June',7=>'July',8=>'August',9=>'September',10=>'October',11=>'November',12=>'December'];
+
         foreach ($slipsToRollout as $slip) {
-            // Update status to 'paid'
-            $db->prepare("UPDATE salary_payments SET status='paid' WHERE id=?")->execute([$slip['id']]);
+            $effectiveAccId = $accountId ?: (int)($slip['account_id'] ?? 0);
+            
+            // Update status to 'paid' and set account_id
+            $db->prepare("UPDATE salary_payments SET status='paid', account_id=? WHERE id=?")->execute([$effectiveAccId ?: null, $slip['id']]);
             $rolledCount++;
+
+            // Post to Company Account Ledger if account_id is selected
+            if ($effectiveAccId > 0) {
+                $mName = $monthNames[$slip['month']] ?? $slip['month'];
+                recordAccountTransaction(
+                    $effectiveAccId,
+                    $slip['payment_date'],
+                    'salary',
+                    'credit', // Money out of company account
+                    (float)$slip['net_salary'],
+                    'salary',
+                    (int)$slip['id'],
+                    "Salary Disbursement: {$slip['emp_name']} ({$mName} {$slip['year']})",
+                    "Payslip #{$slip['slip_number']}",
+                    currentUser()['id']
+                );
+            }
 
             // Dispatch Email if enabled
             if ($isEmailEnabled && !empty($slip['emp_email'])) {
@@ -787,7 +810,7 @@ include __DIR__ . '/../../includes/header.php';
         </div>
         <div class="modal-body">
           <p class="small text-muted mb-3">Rolling out payroll will convert all Draft salary slips for the selected month to <strong>Paid</strong>, lock the amounts for accounting records, and send email notifications to employees (if enabled).</p>
-          <div class="row g-3">
+          <div class="row g-3 mb-3">
             <div class="col-6">
               <label class="form-label small fw-semibold">Rollout Month <span class="text-danger">*</span></label>
               <select name="rollout_month" class="form-select" required>
@@ -804,6 +827,18 @@ include __DIR__ . '/../../includes/header.php';
                 <?php endfor; ?>
               </select>
             </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Disburse From Company Account (Bank / Cash)</label>
+            <select name="account_id" class="form-select">
+              <option value="0">-- Direct / Default Account --</option>
+              <?php foreach (getCompanyAccounts('active') as $ca): ?>
+              <option value="<?= $ca['id'] ?>">
+                <?= htmlspecialchars($ca['account_name']) ?> (<?= strtoupper($ca['account_type']) ?>) — Current Bal: ₹<?= number_format($ca['current_balance'], 2) ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
           </div>
         </div>
         <div class="modal-footer">

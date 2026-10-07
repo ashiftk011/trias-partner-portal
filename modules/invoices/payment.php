@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/accounting.php';
 requireAccess('invoices');
 
 $db = getDB();
@@ -19,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $amount      = (float)$_POST['amount'];
     $paymentDate = $_POST['payment_date'];
     $paymentMode = $_POST['payment_mode'];
+    $accountId   = (int)($_POST['account_id'] ?? 0);
     $txnId       = trim($_POST['transaction_id'] ?? '');
     $notes       = trim($_POST['notes'] ?? '');
     $userId      = currentUser()['id'];
@@ -29,8 +31,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Insert payment
-    $db->prepare("INSERT INTO payments (invoice_id,client_id,amount,payment_date,payment_mode,transaction_id,notes,created_by) VALUES (?,?,?,?,?,?,?,?)")
-       ->execute([$invoiceId,$inv['client_id'],$amount,$paymentDate,$paymentMode,$txnId,$notes,$userId]);
+    $stmtIns = $db->prepare("INSERT INTO payments (invoice_id,client_id,amount,payment_date,payment_mode,account_id,transaction_id,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?)");
+    $stmtIns->execute([$invoiceId,$inv['client_id'],$amount,$paymentDate,$paymentMode,$accountId ?: null,$txnId,$notes,$userId]);
+    $paymentId = (int)$db->lastInsertId();
+
+    // Record ledger entry if company account is selected
+    if ($accountId > 0) {
+        $acc = getCompanyAccountById($accountId);
+        $accName = $acc ? $acc['account_name'] : 'Account';
+        recordAccountTransaction(
+            $accountId,
+            $paymentDate,
+            'invoice_payment',
+            'debit',
+            $amount,
+            'payment',
+            $paymentId,
+            "Payment received for Invoice #{$inv['invoice_no']} ({$inv['client_name']})",
+            $notes,
+            $userId
+        );
+    }
 
     // Update invoice paid amount + status
     $newPaid = (float)$inv['paid_amount'] + $amount;
@@ -42,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $db->prepare("UPDATE invoices SET paid_amount=?, status=? WHERE id=?")->execute([$newPaid,$newStatus,$invoiceId]);
 
-    setFlash('success', 'Payment of ₹'.number_format($amount,2).' recorded. Invoice status: '.ucfirst($newStatus).'.');
+    setFlash('success', 'Payment of ₹'.number_format($amount,2).' recorded successfully. Invoice status: '.ucfirst($newStatus).'.');
     redirect(BASE_URL . '/modules/invoices/view.php?id=' . $invoiceId);
 }
 
@@ -112,6 +133,17 @@ include __DIR__ . '/../../includes/header.php';
               </div>
               <?php endforeach; ?>
             </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Deposit To Company Account (Bank / Cash) *</label>
+            <select name="account_id" class="form-select" required>
+              <option value="">-- Select Receiving Account --</option>
+              <?php foreach (getCompanyAccounts('active') as $ca): ?>
+              <option value="<?= $ca['id'] ?>">
+                <?= htmlspecialchars($ca['account_name']) ?> (<?= strtoupper($ca['account_type']) ?>) — Current Bal: ₹<?= number_format($ca['current_balance'], 2) ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="mb-3">
             <label class="form-label">Transaction ID / Reference</label>

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/accounting.php';
 requireAccess('expenses');
 
 $db = getDB();
@@ -50,15 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 3. SAVE / EDIT EXPENSE
     if ($action === 'save_expense') {
-        $expId   = (int)($_POST['expense_id'] ?? 0);
-        $catId   = (int)($_POST['category_id'] ?? 0);
-        $title   = trim($_POST['title'] ?? '');
-        $vendor  = trim($_POST['vendor_name'] ?? '');
-        $amount  = (float)($_POST['amount'] ?? 0);
-        $expDate = trim($_POST['expense_date'] ?? date('Y-m-d'));
-        $payMode = trim($_POST['payment_mode'] ?? 'bank_transfer');
-        $refNo   = trim($_POST['reference_no'] ?? '');
-        $notes   = trim($_POST['description'] ?? '');
+        $expId     = (int)($_POST['expense_id'] ?? 0);
+        $catId     = (int)($_POST['category_id'] ?? 0);
+        $title     = trim($_POST['title'] ?? '');
+        $vendor    = trim($_POST['vendor_name'] ?? '');
+        $amount    = (float)($_POST['amount'] ?? 0);
+        $expDate   = trim($_POST['expense_date'] ?? date('Y-m-d'));
+        $payMode   = trim($_POST['payment_mode'] ?? 'bank_transfer');
+        $accountId = (int)($_POST['account_id'] ?? 0);
+        $refNo     = trim($_POST['reference_no'] ?? '');
+        $notes     = trim($_POST['description'] ?? '');
 
         if (!$catId || !$title || $amount <= 0 || !$expDate) {
             setFlash('danger', 'Category, Title, Amount, and Expense Date are required.');
@@ -80,9 +82,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Fetch Category Name for Ledger
+        $catStmt = $db->prepare("SELECT name FROM expense_categories WHERE id=?");
+        $catStmt->execute([$catId]);
+        $catName = $catStmt->fetchColumn() ?: 'General Expense';
+
         if ($expId > 0) {
-            $sql = "UPDATE expenses SET category_id=?, title=?, vendor_name=?, amount=?, expense_date=?, payment_mode=?, reference_no=?, description=?";
-            $params = [$catId, $title, $vendor, $amount, $expDate, $payMode, $refNo, $notes];
+            $sql = "UPDATE expenses SET category_id=?, title=?, vendor_name=?, amount=?, expense_date=?, payment_mode=?, account_id=?, reference_no=?, description=?";
+            $params = [$catId, $title, $vendor, $amount, $expDate, $payMode, $accountId ?: null, $refNo, $notes];
             if ($receiptPath) {
                 $sql .= ", receipt_file=?";
                 $params[] = $receiptPath;
@@ -90,12 +97,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sql .= " WHERE id=?";
             $params[] = $expId;
             $db->prepare($sql)->execute($params);
+            $savedExpId = $expId;
             setFlash('success', 'Expense record updated successfully.');
         } else {
-            $db->prepare("INSERT INTO expenses (category_id, title, vendor_name, amount, expense_date, payment_mode, reference_no, description, receipt_file, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)")
-               ->execute([$catId, $title, $vendor, $amount, $expDate, $payMode, $refNo, $notes, $receiptPath, currentUser()['id']]);
+            $stmtIns = $db->prepare("INSERT INTO expenses (category_id, title, vendor_name, amount, expense_date, payment_mode, account_id, reference_no, description, receipt_file, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+            $stmtIns->execute([$catId, $title, $vendor, $amount, $expDate, $payMode, $accountId ?: null, $refNo, $notes, $receiptPath, currentUser()['id']]);
+            $savedExpId = (int)$db->lastInsertId();
             setFlash('success', 'Expense recorded successfully.');
         }
+
+        // Sync with Company Account Ledger
+        syncReferenceTransaction(
+            $accountId ?: null,
+            'expense',
+            $savedExpId,
+            $expDate,
+            'expense',
+            'credit', // Credit asset (Company Account Out)
+            $amount,
+            "Expense: {$title} ({$catName})",
+            $notes,
+            currentUser()['id']
+        );
+
         redirect(BASE_URL . '/modules/expenses/index.php');
     }
 
@@ -103,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete_expense') {
         $expId = (int)($_POST['expense_id'] ?? 0);
         if ($expId) {
+            deleteReferenceTransactions('expense', $expId);
             $db->prepare("DELETE FROM expenses WHERE id=?")->execute([$expId]);
             setFlash('success', 'Expense record deleted.');
         }
@@ -392,6 +417,18 @@ include __DIR__ . '/../../includes/header.php';
             </div>
 
             <div class="col-md-6">
+              <label class="form-label small fw-semibold">Paid From Company Account</label>
+              <select name="account_id" id="exp_account_id" class="form-select">
+                <option value="0">-- Direct / Default Account --</option>
+                <?php foreach (getCompanyAccounts('active') as $ca): ?>
+                <option value="<?= $ca['id'] ?>">
+                  <?= htmlspecialchars($ca['account_name']) ?> (<?= strtoupper($ca['account_type']) ?>) — Current Bal: ₹<?= number_format($ca['current_balance'], 2) ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+
+            <div class="col-md-6">
               <label class="form-label small fw-semibold">Transaction Reference / Receipt No</label>
               <input type="text" name="reference_no" id="exp_ref" class="form-control" placeholder="e.g. UTR-123456 / INV-9988">
             </div>
@@ -499,6 +536,7 @@ function openEditExpenseModal(ex) {
   document.getElementById('exp_amount').value = ex.amount;
   document.getElementById('exp_date').value = ex.expense_date;
   document.getElementById('exp_payment_mode').value = ex.payment_mode || 'bank_transfer';
+  document.getElementById('exp_account_id').value = ex.account_id || 0;
   document.getElementById('exp_ref').value = ex.reference_no || '';
   document.getElementById('exp_desc').value = ex.description || '';
 

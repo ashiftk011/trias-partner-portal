@@ -643,3 +643,48 @@ INSERT INTO expense_categories (name, description, color_code) VALUES
 ON DUPLICATE KEY UPDATE description=VALUES(description), color_code=VALUES(color_code);
 
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS is_viewed TINYINT(1) DEFAULT 0 AFTER status;
+
+-- Migration: Company Financial Accounts & Double-Entry General Ledger
+CREATE TABLE IF NOT EXISTS company_accounts (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    account_name VARCHAR(150) NOT NULL,
+    account_type ENUM('cash','bank','wallet','credit_card','other') DEFAULT 'bank',
+    bank_name VARCHAR(100) NULL,
+    account_number VARCHAR(50) NULL,
+    ifsc_code VARCHAR(20) NULL,
+    branch_name VARCHAR(100) NULL,
+    opening_balance DECIMAL(12,2) DEFAULT 0.00,
+    opening_date DATE NOT NULL,
+    balance_type ENUM('debit','credit') DEFAULT 'debit',
+    current_balance DECIMAL(12,2) DEFAULT 0.00,
+    status ENUM('active','inactive') DEFAULT 'active',
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS account_transactions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    account_id INT NOT NULL,
+    transaction_date DATE NOT NULL,
+    transaction_type ENUM('opening_balance','invoice_payment','advance_payment','expense','salary','transfer_in','transfer_out','direct_debit','direct_credit') NOT NULL,
+    type ENUM('debit','credit') NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    balance_after DECIMAL(12,2) DEFAULT 0.00,
+    reference_type ENUM('payment','expense','salary','invoice','transfer','manual','opening') DEFAULT 'manual',
+    reference_id INT NULL,
+    description VARCHAR(255) NULL,
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (account_id) REFERENCES company_accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_mode;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_mode;
+ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_mode;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_account_id INT NULL AFTER advance_date;
+

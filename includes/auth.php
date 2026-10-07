@@ -7,9 +7,9 @@ require_once __DIR__ . '/../config/db.php';
 
 // Role permission map
 const ROLE_PERMISSIONS = [
-    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','payments','settings','proposals','quotations','demos','regions','hr','expenses'],
-    'finance'  => ['dashboard','invoices','clients','renewals','payments','hr','expenses'],
-    'accounts' => ['dashboard','payments','invoices','hr'],
+    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','payments','settings','proposals','quotations','demos','regions','hr','expenses','accounts'],
+    'finance'  => ['dashboard','invoices','clients','renewals','payments','hr','expenses','accounts'],
+    'accounts' => ['dashboard','payments','invoices','hr','expenses','accounts'],
     'telecall' => ['dashboard','leads'],
     'investor' => ['dashboard','clients','leads'],
     'csm'      => ['dashboard','leads','clients','proposals','quotations','demos'],

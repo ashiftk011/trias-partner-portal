@@ -32,6 +32,14 @@ $navSections = [
         ]
     ],
     [
+        'title' => 'ACCOUNTS & REPORTS',
+        'items' => [
+            ['module'=>'accounts', 'submodule'=>'accounts', 'icon'=>'bank',                'label'=>'Bank & Cash Accounts', 'url'=>BASE_URL.'/modules/accounts/index.php'],
+            ['module'=>'accounts', 'submodule'=>'ledger',   'icon'=>'journal-bookmark-fill','label'=>'Account Ledgers',      'url'=>BASE_URL.'/modules/accounts/ledger.php'],
+            ['module'=>'accounts', 'submodule'=>'reports',  'icon'=>'graph-up-arrow',       'label'=>'Financial Reports',   'url'=>BASE_URL.'/modules/accounts/reports.php'],
+        ]
+    ],
+    [
         'title' => 'HR & PAYROLL',
         'items' => [
             ['module'=>'hr', 'submodule'=>'employees', 'icon'=>'person-badge-fill','label'=>'Employees',   'url'=>BASE_URL.'/modules/hr/employees.php'],
@@ -112,6 +120,12 @@ try {
                           $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']);
                       } elseif ($item['submodule'] === 'payroll') {
                           $isActive = in_array($currentPageScript, ['payroll.php', 'payslip.php']);
+                      } elseif ($item['submodule'] === 'accounts') {
+                          $isActive = in_array($currentPageScript, ['index.php', 'save_account.php', 'transfer.php']);
+                      } elseif ($item['submodule'] === 'ledger') {
+                          $isActive = in_array($currentPageScript, ['ledger.php']);
+                      } elseif ($item['submodule'] === 'reports') {
+                          $isActive = in_array($currentPageScript, ['reports.php']);
                       } else {
                           $isActive = true;
                       }
