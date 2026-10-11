@@ -26,19 +26,31 @@ $trialLoginUrl  = ($status === 'trial' || $status === 'trial_ended') && !empty($
 $trialUsername  = ($status === 'trial' || $status === 'trial_ended') && !empty($_POST['trial_username']) ? trim($_POST['trial_username']) : null;
 $trialPassword  = ($status === 'trial' || $status === 'trial_ended') && !empty($_POST['trial_password']) ? trim($_POST['trial_password']) : null;
 
+$user = currentUser();
+
 if (!$name || !$phone || !$projectId) {
     setFlash('error', 'Name, phone and project are required.');
     redirect(BASE_URL . '/modules/leads/index.php');
 }
 
 if ($id > 0) {
+    if (isRole('csm')) {
+        $chk = $db->prepare("SELECT created_by FROM leads WHERE id=?");
+        $chk->execute([$id]);
+        $creator = $chk->fetchColumn();
+        if ((int)$creator !== (int)$user['id']) {
+            setFlash('error', 'You do not have permission to edit this lead.');
+            redirect(BASE_URL . '/modules/leads/index.php');
+        }
+    }
     $db->prepare("UPDATE leads SET project_id=?,region_id=?,name=?,email=?,phone=?,company=?,designation=?,website=?,address=?,source=?,status=?,assigned_to=?,interested_plan_id=?,trial_end_date=?,trial_login_url=?,trial_username=?,trial_password=?,notes=?,updated_at=NOW() WHERE id=?")
        ->execute([$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$trialEndDate,$trialLoginUrl,$trialUsername,$trialPassword,$notes,$id]);
     setFlash('success', 'Lead updated successfully.');
 } else {
     $code = generateCode('LD', 'leads', 'lead_code');
-    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,website,address,source,status,assigned_to,interested_plan_id,trial_end_date,trial_login_url,trial_username,trial_password,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-       ->execute([$code,$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$trialEndDate,$trialLoginUrl,$trialUsername,$trialPassword,$notes]);
+    $currentUserId = $user['id'] ?: null;
+    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,website,address,source,status,assigned_to,interested_plan_id,trial_end_date,trial_login_url,trial_username,trial_password,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+       ->execute([$code,$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$trialEndDate,$trialLoginUrl,$trialUsername,$trialPassword,$notes,$currentUserId]);
     setFlash('success', 'Lead added successfully. Code: ' . $code);
 }
 

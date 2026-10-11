@@ -4,7 +4,9 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('clients');
 
 $db = getDB();
+$user = currentUser();
 $isInvestor = isRole('investor');
+$isCsm = isRole('csm');
 $investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
 
 $filterProject = $isInvestor ? $investorProjectId : (isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0);
@@ -19,6 +21,10 @@ $sql = "SELECT c.*, p.name as project_name, pl.name as plan_name, r.name as regi
         LEFT JOIN regions r ON r.id=c.region_id
         WHERE 1=1";
 $params = [];
+if ($isCsm) {
+    $sql .= " AND c.created_by = ?";
+    $params[] = $user['id'];
+}
 if ($filterProject) { $sql .= " AND c.project_id=?"; $params[] = $filterProject; }
 if ($filterStatus)  { $sql .= " AND c.status=?";     $params[] = $filterStatus; }
 if ($filterSearch)  { $sql .= " AND (c.name LIKE ? OR c.phone LIKE ? OR c.company LIKE ? OR c.client_code LIKE ?)";
@@ -32,8 +38,16 @@ $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER
 
 // Summary counts
 $counts = [];
-foreach ($db->query("SELECT status, COUNT(*) as cnt FROM clients GROUP BY status") as $row) {
-    $counts[$row['status']] = $row['cnt'];
+if ($isCsm) {
+    $cntStmt = $db->prepare("SELECT status, COUNT(*) as cnt FROM clients WHERE created_by = ? GROUP BY status");
+    $cntStmt->execute([$user['id']]);
+    foreach ($cntStmt as $row) {
+        $counts[$row['status']] = $row['cnt'];
+    }
+} else {
+    foreach ($db->query("SELECT status, COUNT(*) as cnt FROM clients GROUP BY status") as $row) {
+        $counts[$row['status']] = $row['cnt'];
+    }
 }
 
 $pageTitle = 'Clients';

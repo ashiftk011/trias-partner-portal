@@ -23,4 +23,9 @@ if (!$client) {
     exit;
 }
 
+if (isRole('csm') && (int)($client['created_by'] ?? 0) !== (int)($_SESSION['user_id'] ?? 0)) {
+    echo json_encode(['error' => 'Client not found']);
+    exit;
+}
+
 echo json_encode($client);

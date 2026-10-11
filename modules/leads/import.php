@@ -94,7 +94,8 @@ while (($row = fgetcsv($handle)) !== false) {
     $status = in_array($data['status'] ?? '', $validStatuses) ? $data['status'] : 'new';
 
     $code = generateCode('LD', 'leads', 'lead_code');
-    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,website,address,source,status,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    $currentUserId = $user['id'] ?: null;
+    $db->prepare("INSERT INTO leads (lead_code,project_id,region_id,name,email,phone,company,designation,website,address,source,status,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
        ->execute([
            $code, $projectId, $regionId,
            $name,
@@ -106,7 +107,8 @@ while (($row = fgetcsv($handle)) !== false) {
            $data['address'] ?? '',
            $source,
            $status,
-           $data['notes'] ?? ''
+           $data['notes'] ?? '',
+           $currentUserId
        ]);
     $imported++;
 }

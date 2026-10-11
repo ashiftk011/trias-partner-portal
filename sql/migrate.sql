@@ -688,3 +688,8 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_
 ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_mode;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_account_id INT NULL AFTER advance_date;
 
+-- Migration: Track creator on leads and clients for CSM scoped visibility
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_by INT NULL AFTER assigned_to;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS created_by INT NULL AFTER status;
+
+

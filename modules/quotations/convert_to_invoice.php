@@ -33,6 +33,11 @@ if (!$q) {
     redirect(BASE_URL . '/modules/quotations/index.php');
 }
 
+if (isRole('csm') && (int)$q['created_by'] !== (int)$_SESSION['user_id']) {
+    setFlash('error', 'You do not have permission to convert this quotation.');
+    redirect(BASE_URL . '/modules/quotations/index.php');
+}
+
 // Must be linked to a client
 if (empty($q['client_id'])) {
     setFlash('error', 'This quotation is not linked to a client. Please link it to a converted client before converting to an invoice.');

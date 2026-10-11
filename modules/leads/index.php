@@ -8,6 +8,7 @@ $user       = currentUser();
 $isInvestor = isRole('investor');
 $isTelecall = isRole('telecall');
 $isAdmin    = isRole('admin');
+$isCsm      = isRole('csm');
 $investorProjectId    = $isInvestor ? getInvestorProjectId() : 0;
 $telecallProjectIds   = $isTelecall ? getTelecallProjectIds() : [];
 
@@ -41,6 +42,9 @@ if ($isTelecall && $telecallProjectIds) {
     $params = array_merge($params, $telecallProjectIds);
 } elseif ($isTelecall) {
     $sql .= " AND 1=0"; // no projects assigned yet → show nothing
+} elseif ($isCsm) {
+    $sql .= " AND l.created_by = ?";
+    $params[] = $user['id'];
 }
 
 if ($filterProject) { $sql .= " AND l.project_id=?"; $params[] = $filterProject; }
@@ -90,6 +94,9 @@ if ($isTelecall && $telecallProjectIds) {
 } elseif ($isInvestor && $investorProjectId) {
     $countSql .= " AND project_id=?";
     $countParams[] = $investorProjectId;
+} elseif ($isCsm) {
+    $countSql .= " AND created_by=?";
+    $countParams[] = $user['id'];
 }
 $countSql .= " GROUP BY status";
 $countStmt = $db->prepare($countSql);
@@ -104,12 +111,14 @@ include __DIR__ . '/../../includes/header.php';
   <div><h4 class="mb-0">Leads Management</h4><p class="text-muted small mb-0">Track and manage all client leads with automated Instagram sync</p></div>
   <?php if (!$isInvestor): ?>
   <div class="d-flex gap-2">
+    <?php if ($isAdmin): ?>
     <button type="button" class="btn btn-outline-danger" id="btnSyncMetaLeadsDirect">
       <i class="bi bi-arrow-repeat me-1"></i>Sync Meta Leads
     </button>
     <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#instagramModal">
       <i class="bi bi-instagram me-1"></i>Meta Webhook & Setup
     </button>
+    <?php endif; ?>
     <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#csvModal">
       <i class="bi bi-file-earmark-arrow-up me-1"></i>Import CSV
     </button>
@@ -571,6 +580,7 @@ include __DIR__ . '/../../includes/header.php';
 </div>
 
 <!-- Modal: Instagram & Meta Leads Automation -->
+<?php if ($isAdmin): ?>
 <div class="modal fade" id="instagramModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content border-0 shadow-lg">
@@ -675,6 +685,7 @@ include __DIR__ . '/../../includes/header.php';
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <script>
 const allPlans = <?= json_encode($db->query("SELECT id,project_id,name,price FROM plans WHERE status='active' ORDER BY name")->fetchAll()) ?>;

@@ -14,6 +14,10 @@ if ($id) {
     $stmt->execute([$id]);
     $proposal = $stmt->fetch();
     if (!$proposal) { setFlash('error','Proposal not found.'); redirect(BASE_URL.'/modules/proposals/index.php'); }
+    if (isRole('csm') && (int)$proposal['created_by'] !== (int)$user['id']) {
+        setFlash('error', 'You do not have permission to view or edit this proposal.');
+        redirect(BASE_URL . '/modules/proposals/index.php');
+    }
     $items = $db->prepare("SELECT * FROM proposal_items WHERE proposal_id=? ORDER BY id");
     $items->execute([$id]);
     $items = $items->fetchAll();
@@ -86,8 +90,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
-$clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+if (isRole('csm')) {
+    $lStmt = $db->prepare("SELECT id,name,company FROM leads WHERE created_by = ? ORDER BY name");
+    $lStmt->execute([$user['id']]);
+    $leads = $lStmt->fetchAll();
+
+    $cStmt = $db->prepare("SELECT id,name,company FROM clients WHERE created_by = ? ORDER BY name");
+    $cStmt->execute([$user['id']]);
+    $clients = $cStmt->fetchAll();
+} else {
+    $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
+    $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+}
 
 $p = $proposal ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','description'=>'',
      'valid_until'=>'','subtotal'=>0,'discount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>''];

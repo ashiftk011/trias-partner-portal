@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../includes/currencies.php';
 requireAccess('quotations');
 
 $db = getDB();
+$user = currentUser();
+$isCsm = isRole('csm');
 
 $filterStatus  = $_GET['status'] ?? '';
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -20,6 +22,10 @@ $sql = "SELECT q.*, pr.name as project_name,
         LEFT JOIN users u ON u.id = q.created_by
         WHERE 1=1";
 $params = [];
+if ($isCsm) {
+    $sql .= " AND q.created_by = ?";
+    $params[] = $user['id'];
+}
 if ($filterStatus)  { $sql .= " AND q.status=?";     $params[] = $filterStatus; }
 if ($filterProject) { $sql .= " AND q.project_id=?"; $params[] = $filterProject; }
 if ($filterSearch)  { $sql .= " AND (q.title LIKE ? OR q.quotation_no LIKE ?)";
@@ -30,7 +36,13 @@ $stmt = $db->prepare($sql); $stmt->execute($params);
 $quotations = $stmt->fetchAll();
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$counts   = $db->query("SELECT status, COUNT(*) cnt FROM quotations GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+if ($isCsm) {
+    $cntStmt = $db->prepare("SELECT status, COUNT(*) cnt FROM quotations WHERE created_by = ? GROUP BY status");
+    $cntStmt->execute([$user['id']]);
+    $counts = $cntStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+} else {
+    $counts   = $db->query("SELECT status, COUNT(*) cnt FROM quotations GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+}
 
 $pageTitle = 'Quotations';
 include __DIR__ . '/../../includes/header.php';

@@ -8,6 +8,7 @@ $db = getDB();
 $user = currentUser();
 $isInvestor = isRole('investor');
 $isTelecall = isRole('telecall');
+$isCsm      = isRole('csm');
 $investorProjectId  = $isInvestor ? getInvestorProjectId() : 0;
 $telecallProjectIds = $isTelecall ? getTelecallProjectIds() : [];
 
@@ -30,6 +31,11 @@ if (hasAccess('leads')) {
         $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE $tcWhere AND status='follow_up'"); $stmt->execute($tcParams); $stats['follow_up_leads'] = $stmt->fetchColumn();
     } elseif ($isTelecall) {
         $stats['total_leads'] = $stats['new_leads'] = $stats['converted_leads'] = $stats['follow_up_leads'] = 0;
+    } elseif ($isCsm) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE created_by=?"); $stmt->execute([$user['id']]); $stats['total_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE created_by=? AND status='new'"); $stmt->execute([$user['id']]); $stats['new_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE created_by=? AND status='converted'"); $stmt->execute([$user['id']]); $stats['converted_leads'] = $stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM leads WHERE created_by=? AND status='follow_up'"); $stmt->execute([$user['id']]); $stats['follow_up_leads'] = $stmt->fetchColumn();
     } else {
         $stats['total_leads']     = $db->query("SELECT COUNT(*) FROM leads")->fetchColumn();
         $stats['new_leads']       = $db->query("SELECT COUNT(*) FROM leads WHERE status='new'")->fetchColumn();
@@ -42,6 +48,10 @@ if (hasAccess('clients')) {
     if ($isInvestor && $investorProjectId) {
         $stmt = $db->prepare("SELECT COUNT(*) FROM clients WHERE status='active' AND project_id=?");
         $stmt->execute([$investorProjectId]);
+        $stats['total_clients'] = $stmt->fetchColumn();
+    } elseif ($isCsm) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM clients WHERE status='active' AND created_by=?");
+        $stmt->execute([$user['id']]);
         $stats['total_clients'] = $stmt->fetchColumn();
     } else {
         $stats['total_clients']  = $db->query("SELECT COUNT(*) FROM clients WHERE status='active'")->fetchColumn();
@@ -84,6 +94,8 @@ if (hasAccess('renewals') || hasAccess('clients')) {
 
     if ($isInvestor && $investorProjectId) {
         $sqlExp .= " AND c.project_id = " . (int)$investorProjectId;
+    } elseif ($isCsm) {
+        $sqlExp .= " AND c.created_by = " . (int)$user['id'];
     }
 
     $stmtExp = $db->query($sqlExp);
@@ -141,6 +153,10 @@ if (hasAccess('leads')) {
         $stmt = $db->prepare("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id WHERE l.project_id IN ($in) ORDER BY l.created_at DESC LIMIT 5");
         $stmt->execute($telecallProjectIds);
         $recentLeads = $stmt->fetchAll();
+    } elseif ($isCsm) {
+        $stmt = $db->prepare("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id WHERE l.created_by=? ORDER BY l.created_at DESC LIMIT 5");
+        $stmt->execute([$user['id']]);
+        $recentLeads = $stmt->fetchAll();
     } else {
         $stmt = $db->query("SELECT l.*, p.name as project_name FROM leads l LEFT JOIN projects p ON p.id=l.project_id ORDER BY l.created_at DESC LIMIT 5");
         $recentLeads = $stmt->fetchAll();
@@ -152,6 +168,34 @@ $recentPayments = [];
 if (hasAccess('invoices') || hasAccess('payments')) {
     $stmt = $db->query("SELECT py.*, c.name as client_name, i.invoice_no FROM payments py LEFT JOIN clients c ON c.id=py.client_id LEFT JOIN invoices i ON i.id=py.invoice_id ORDER BY py.created_at DESC LIMIT 5");
     $recentPayments = $stmt->fetchAll();
+}
+
+// Quotations (for CSM and users with quotations access)
+$recentQuotations = [];
+if (hasAccess('quotations')) {
+    if ($isCsm) {
+        $qStmt = $db->prepare("SELECT COUNT(*) FROM quotations WHERE created_by=?");
+        $qStmt->execute([$user['id']]);
+        $stats['total_quotations'] = (int)$qStmt->fetchColumn();
+
+        $qStmt = $db->prepare("SELECT COUNT(*) FROM quotations WHERE created_by=? AND status='accepted'");
+        $qStmt->execute([$user['id']]);
+        $stats['accepted_quotations'] = (int)$qStmt->fetchColumn();
+
+        $qStmt = $db->prepare("SELECT COUNT(*) FROM quotations WHERE created_by=? AND status='sent'");
+        $qStmt->execute([$user['id']]);
+        $stats['sent_quotations'] = (int)$qStmt->fetchColumn();
+
+        $rqStmt = $db->prepare("SELECT q.*, COALESCE(c.name, l.name) as contact_name FROM quotations q LEFT JOIN clients c ON c.id=q.client_id LEFT JOIN leads l ON l.id=q.lead_id WHERE q.created_by=? ORDER BY q.created_at DESC LIMIT 5");
+        $rqStmt->execute([$user['id']]);
+        $recentQuotations = $rqStmt->fetchAll();
+    } else {
+        $stats['total_quotations'] = (int)$db->query("SELECT COUNT(*) FROM quotations")->fetchColumn();
+        $stats['accepted_quotations'] = (int)$db->query("SELECT COUNT(*) FROM quotations WHERE status='accepted'")->fetchColumn();
+        $stats['sent_quotations'] = (int)$db->query("SELECT COUNT(*) FROM quotations WHERE status='sent'")->fetchColumn();
+
+        $recentQuotations = $db->query("SELECT q.*, COALESCE(c.name, l.name) as contact_name FROM quotations q LEFT JOIN clients c ON c.id=q.client_id LEFT JOIN leads l ON l.id=q.lead_id ORDER BY q.created_at DESC LIMIT 5")->fetchAll();
+    }
 }
 
 include __DIR__ . '/../../includes/header.php';
@@ -239,6 +283,24 @@ include __DIR__ . '/../../includes/header.php';
             <?php if ($stats['overdue_invoices'] > 0): ?>
             <span class="badge bg-danger"><?= $stats['overdue_invoices'] ?> Overdue</span>
             <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<?php elseif (hasAccess('quotations')): ?>
+  <div class="col-sm-6 col-xl-3">
+    <div class="stat-card card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-warning-subtle rounded-3 p-3">
+          <i class="bi bi-calculator fs-3 text-warning"></i>
+        </div>
+        <div>
+          <div class="stat-value fw-bold fs-3"><?= number_format($stats['total_quotations'] ?? 0) ?></div>
+          <div class="stat-label text-muted small"><?= $isCsm ? 'My Quotations' : 'Total Quotations' ?></div>
+          <div class="mt-1">
+            <span class="badge bg-success"><?= $stats['accepted_quotations'] ?? 0 ?> Accepted</span>
+            <span class="badge bg-info text-dark"><?= $stats['sent_quotations'] ?? 0 ?> Sent</span>
           </div>
         </div>
       </div>
@@ -374,7 +436,7 @@ include __DIR__ . '/../../includes/header.php';
   </div>
   <?php endif; ?>
 
-  <!-- Recent Payments -->
+  <!-- Recent Payments (or Recent Quotations for CSM) -->
   <?php if ((hasAccess('invoices') || hasAccess('payments')) && $recentPayments): ?>
   <div class="col-xl-5">
     <div class="card border-0 shadow-sm">
@@ -395,6 +457,39 @@ include __DIR__ . '/../../includes/header.php';
                 <td><small class="text-muted"><?= htmlspecialchars($p['invoice_no']) ?></small></td>
                 <td class="text-success fw-semibold">₹<?= number_format($p['amount'], 2) ?></td>
                 <td class="text-muted small"><?= date('d M', strtotime($p['payment_date'])) ?></td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php elseif (hasAccess('quotations') && !empty($recentQuotations)): ?>
+  <div class="col-xl-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h6 class="mb-0 fw-semibold"><i class="bi bi-calculator me-2 text-warning"></i><?= $isCsm ? 'My Recent Quotations' : 'Recent Quotations' ?></h6>
+        <a href="<?= BASE_URL ?>/modules/quotations/index.php" class="btn btn-sm btn-outline-warning">View All</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th>Quotation</th><th>Contact</th><th>Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($recentQuotations as $q): ?>
+              <tr>
+                <td>
+                  <a href="<?= BASE_URL ?>/modules/quotations/view.php?id=<?= $q['id'] ?>" class="fw-semibold text-decoration-none">
+                    <?= htmlspecialchars($q['quotation_no']) ?>
+                  </a>
+                  <div class="text-muted small"><?= htmlspecialchars($q['title']) ?></div>
+                </td>
+                <td class="small"><?= htmlspecialchars($q['contact_name'] ?? 'N/A') ?></td>
+                <td class="text-primary fw-semibold small">₹<?= number_format($q['total_amount'], 2) ?></td>
+                <td><?= statusBadge($q['status']) ?></td>
               </tr>
               <?php endforeach; ?>
             </tbody>

@@ -76,12 +76,14 @@ CREATE TABLE leads (
     trial_username VARCHAR(100) NULL,
     trial_password VARCHAR(100) NULL,
     notes TEXT,
+    created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (project_id) REFERENCES projects(id),
     FOREIGN KEY (region_id) REFERENCES regions(id) ON DELETE SET NULL,
     FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (interested_plan_id) REFERENCES plans(id) ON DELETE SET NULL
+    FOREIGN KEY (interested_plan_id) REFERENCES plans(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Lead Response Feeding
@@ -119,12 +121,14 @@ CREATE TABLE clients (
     gst_no VARCHAR(20),
     pan_no VARCHAR(20),
     status ENUM('active','inactive','suspended') DEFAULT 'active',
+    created_by INT,
     joined_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE SET NULL,
     FOREIGN KEY (project_id) REFERENCES projects(id),
     FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL,
-    FOREIGN KEY (region_id) REFERENCES regions(id) ON DELETE SET NULL
+    FOREIGN KEY (region_id) REFERENCES regions(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Client Instances (multiple applications/instances per client)

@@ -7,11 +7,17 @@ $db = getDB();
 $id = (int)($_GET['id'] ?? 0);
 $client = null;
 
+$user = currentUser();
+
 if ($id) {
     $stmt = $db->prepare("SELECT * FROM clients WHERE id=?");
     $stmt->execute([$id]);
     $client = $stmt->fetch();
     if (!$client) { setFlash('danger','Client not found.'); redirect(BASE_URL . '/modules/clients/index.php'); }
+    if (isRole('csm') && (int)($client['created_by'] ?? 0) !== (int)$user['id']) {
+        setFlash('danger', 'You do not have permission to edit this client.');
+        redirect(BASE_URL . '/modules/clients/index.php');
+    }
 }
 
 // Local wrapper for client code generation
@@ -64,14 +70,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Insert
             $clientCode = generateClientCode($db);
+            $currentUserId = $user['id'] ?: null;
             $db->prepare("INSERT INTO clients (client_code,name,email,phone,alt_phone,company,designation,
-                project_id,plan_id,region_id,address,city,state,pincode,gst_no,pan_no,joined_date,status)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                project_id,plan_id,region_id,address,city,state,pincode,gst_no,pan_no,joined_date,status,created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                ->execute([
                    $clientCode,$data['name'],$data['email'],$data['phone'],$data['alt_phone'],$data['company'],
                    $data['designation'],$data['project_id'],$data['plan_id'],$data['region_id'],$data['address'],
                    $data['city'],$data['state'],$data['pincode'],$data['gst_no'],$data['pan_no'],
-                   $data['joined_date'],$data['status']
+                   $data['joined_date'],$data['status'],$currentUserId
                ]);
             $id = $db->lastInsertId();
             setFlash('success', "Client created with code $clientCode.");

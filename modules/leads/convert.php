@@ -15,6 +15,20 @@ if (!$lead || $lead['status'] === 'converted') {
     redirect(BASE_URL . '/modules/leads/index.php');
 }
 
+$user = currentUser();
+if (isRole('csm') && (int)($lead['created_by'] ?? 0) !== (int)$user['id']) {
+    setFlash('error', 'You do not have permission to convert this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+if (isRole('investor') && (int)$lead['project_id'] !== getInvestorProjectId()) {
+    setFlash('error', 'You do not have permission to convert this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+if (isRole('telecall') && !in_array((int)$lead['project_id'], getTelecallProjectIds())) {
+    setFlash('error', 'You do not have permission to convert this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+
 $plans   = $db->query("SELECT pl.*,p.name as project_name,r.name as region_name FROM plans pl LEFT JOIN projects p ON p.id=pl.project_id LEFT JOIN regions r ON r.id=pl.region_id WHERE pl.status='active' ORDER BY p.name,pl.name")->fetchAll();
 $regions = $db->query("SELECT id,name FROM regions WHERE status='active' ORDER BY name")->fetchAll();
 
@@ -40,8 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Create client using consistent generateClientCode
         $clientCode = generateClientCode($db);
-        $db->prepare("INSERT INTO clients (client_code,lead_id,project_id,plan_id,region_id,name,email,phone,company,designation,address,city,state,pincode,gst_no,pan_no,joined_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-           ->execute([$clientCode,$id,$projectId,$planId,$regionId,$name,$email,$phone,$company,$designation,$address,$city,$state,$pincode,$gst,$pan,$joinedDate]);
+        $currentUserId = $user['id'] ?: null;
+        $db->prepare("INSERT INTO clients (client_code,lead_id,project_id,plan_id,region_id,name,email,phone,company,designation,address,city,state,pincode,gst_no,pan_no,joined_date,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+           ->execute([$clientCode,$id,$projectId,$planId,$regionId,$name,$email,$phone,$company,$designation,$address,$city,$state,$pincode,$gst,$pan,$joinedDate,$currentUserId]);
 
         $clientId = $db->lastInsertId();
 

@@ -12,6 +12,20 @@ $stmt->execute([$id]);
 $lead = $stmt->fetch();
 if (!$lead) { redirect(BASE_URL . '/modules/leads/index.php'); }
 
+$user = currentUser();
+if (isRole('csm') && (int)($lead['created_by'] ?? 0) !== (int)$user['id']) {
+    setFlash('error', 'You do not have permission to view this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+if (isRole('investor') && (int)$lead['project_id'] !== getInvestorProjectId()) {
+    setFlash('error', 'You do not have permission to view this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+if (isRole('telecall') && !in_array((int)$lead['project_id'], getTelecallProjectIds())) {
+    setFlash('error', 'You do not have permission to view this lead.');
+    redirect(BASE_URL . '/modules/leads/index.php');
+}
+
 // Mark lead as viewed
 if (empty($lead['is_viewed'])) {
     $db->prepare("UPDATE leads SET is_viewed = 1 WHERE id = ?")->execute([$id]);

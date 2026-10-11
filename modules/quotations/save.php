@@ -15,6 +15,10 @@ if ($id) {
     $stmt->execute([$id]);
     $quotation = $stmt->fetch();
     if (!$quotation) { setFlash('error','Quotation not found.'); redirect(BASE_URL.'/modules/quotations/index.php'); }
+    if (isRole('csm') && (int)$quotation['created_by'] !== (int)$user['id']) {
+        setFlash('error', 'You do not have permission to view or edit this quotation.');
+        redirect(BASE_URL . '/modules/quotations/index.php');
+    }
     $si = $db->prepare("SELECT * FROM quotation_items WHERE quotation_id=? ORDER BY id");
     $si->execute([$id]); $items = $si->fetchAll();
 }
@@ -99,8 +103,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
-$clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+if (isRole('csm')) {
+    $lStmt = $db->prepare("SELECT id,name,company FROM leads WHERE created_by = ? ORDER BY name");
+    $lStmt->execute([$user['id']]);
+    $leads = $lStmt->fetchAll();
+
+    $cStmt = $db->prepare("SELECT id,name,company FROM clients WHERE created_by = ? ORDER BY name");
+    $cStmt->execute([$user['id']]);
+    $clients = $cStmt->fetchAll();
+} else {
+    $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
+    $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+}
 
 $q = $quotation ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','valid_until'=>'',
      'subtotal'=>0,'discount'=>0,'discount_type'=>'after_gst','tax_percent'=>18,'tax_amount'=>0,'total_amount'=>0,'status'=>'draft','notes'=>'','terms_conditions'=>null,'currency'=>'INR'];

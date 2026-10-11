@@ -12,6 +12,16 @@ $stmt->execute([$id]);
 $client = $stmt->fetch();
 if (!$client) redirect(BASE_URL . '/modules/clients/index.php');
 
+$user = currentUser();
+if (isRole('csm') && (int)($client['created_by'] ?? 0) !== (int)$user['id']) {
+    setFlash('error', 'You do not have permission to view or edit this client.');
+    redirect(BASE_URL . '/modules/clients/index.php');
+}
+if (isRole('investor') && (int)$client['project_id'] !== getInvestorProjectId()) {
+    setFlash('error', 'You do not have permission to view or edit this client.');
+    redirect(BASE_URL . '/modules/clients/index.php');
+}
+
 // Fetch all instances for this client
 $instStmt = $db->prepare("SELECT * FROM client_instances WHERE client_id=? ORDER BY is_default DESC, id ASC");
 $instStmt->execute([$id]);

@@ -13,6 +13,10 @@ if ($id) {
     $stmt->execute([$id]);
     $demo = $stmt->fetch();
     if (!$demo) { setFlash('error','Demo not found.'); redirect(BASE_URL.'/modules/demos/index.php'); }
+    if (isRole('csm') && (int)$demo['created_by'] !== (int)$user['id']) {
+        setFlash('error', 'You do not have permission to view or edit this demo.');
+        redirect(BASE_URL . '/modules/demos/index.php');
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -58,8 +62,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
-$clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+if (isRole('csm')) {
+    $lStmt = $db->prepare("SELECT id,name,company FROM leads WHERE created_by = ? ORDER BY name");
+    $lStmt->execute([$user['id']]);
+    $leads = $lStmt->fetchAll();
+
+    $cStmt = $db->prepare("SELECT id,name,company FROM clients WHERE created_by = ? ORDER BY name");
+    $cStmt->execute([$user['id']]);
+    $clients = $cStmt->fetchAll();
+} else {
+    $leads    = $db->query("SELECT id,name,company FROM leads ORDER BY name")->fetchAll();
+    $clients  = $db->query("SELECT id,name,company FROM clients ORDER BY name")->fetchAll();
+}
 $agents   = $db->query("SELECT id,name FROM users WHERE status='active' ORDER BY name")->fetchAll();
 
 $d = $demo ?? ['title'=>'','project_id'=>'','lead_id'=>'','client_id'=>'','assigned_to'=>'',

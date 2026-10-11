@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('demos');
 
 $db = getDB();
+$user = currentUser();
+$isCsm = isRole('csm');
 
 $filterStatus  = $_GET['status'] ?? '';
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -21,6 +23,10 @@ $sql = "SELECT d.*, pr.name as project_name,
         LEFT JOIN users cb ON cb.id = d.created_by
         WHERE 1=1";
 $params = [];
+if ($isCsm) {
+    $sql .= " AND d.created_by = ?";
+    $params[] = $user['id'];
+}
 if ($filterStatus)  { $sql .= " AND d.status=?";     $params[] = $filterStatus; }
 if ($filterProject) { $sql .= " AND d.project_id=?"; $params[] = $filterProject; }
 if ($filterSearch)  { $sql .= " AND (d.title LIKE ? OR d.demo_no LIKE ? OR COALESCE(c.name,l.name) LIKE ?)";
@@ -31,7 +37,13 @@ $stmt = $db->prepare($sql); $stmt->execute($params);
 $demos = $stmt->fetchAll();
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$counts   = $db->query("SELECT status, COUNT(*) cnt FROM demos GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+if ($isCsm) {
+    $dStmt = $db->prepare("SELECT status, COUNT(*) cnt FROM demos WHERE created_by = ? GROUP BY status");
+    $dStmt->execute([$user['id']]);
+    $counts = $dStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+} else {
+    $counts   = $db->query("SELECT status, COUNT(*) cnt FROM demos GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+}
 
 // Group upcoming demos for today
 $todayDemos = array_filter($demos, fn($d) => date('Y-m-d', strtotime($d['scheduled_at'])) === date('Y-m-d') && $d['status'] === 'scheduled');

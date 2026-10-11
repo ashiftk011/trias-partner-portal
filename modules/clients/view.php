@@ -12,6 +12,16 @@ $stmt->execute([$id]);
 $client = $stmt->fetch();
 if (!$client) redirect(BASE_URL . '/modules/clients/index.php');
 
+$user = currentUser();
+if (isRole('csm') && (int)($client['created_by'] ?? 0) !== (int)$user['id']) {
+    setFlash('error', 'You do not have permission to view this client.');
+    redirect(BASE_URL . '/modules/clients/index.php');
+}
+if (isRole('investor') && (int)$client['project_id'] !== getInvestorProjectId()) {
+    setFlash('error', 'You do not have permission to view this client.');
+    redirect(BASE_URL . '/modules/clients/index.php');
+}
+
 // Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';

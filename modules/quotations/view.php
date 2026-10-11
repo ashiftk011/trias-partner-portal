@@ -28,6 +28,12 @@ $stmt->execute([$id]);
 $inv = $stmt->fetch();
 if (!$inv) redirect(BASE_URL . '/modules/quotations/index.php');
 
+$user = currentUser();
+if (isRole('csm') && (int)($inv['created_by'] ?? 0) !== (int)$user['id']) {
+    setFlash('error', 'You do not have permission to view this quotation.');
+    redirect(BASE_URL . '/modules/quotations/index.php');
+}
+
 // Line items
 $itemStmt = $db->prepare("SELECT * FROM quotation_items WHERE quotation_id=? ORDER BY id");
 $itemStmt->execute([$id]);

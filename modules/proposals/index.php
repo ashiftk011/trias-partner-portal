@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('proposals');
 
 $db = getDB();
+$user = currentUser();
+$isCsm = isRole('csm');
 
 $filterStatus  = $_GET['status'] ?? '';
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
@@ -19,6 +21,10 @@ $sql = "SELECT p.*, pr.name as project_name,
         LEFT JOIN users u ON u.id = p.created_by
         WHERE 1=1";
 $params = [];
+if ($isCsm) {
+    $sql .= " AND p.created_by = ?";
+    $params[] = $user['id'];
+}
 if ($filterStatus)  { $sql .= " AND p.status=?";     $params[] = $filterStatus; }
 if ($filterProject) { $sql .= " AND p.project_id=?"; $params[] = $filterProject; }
 if ($filterSearch)  { $sql .= " AND (p.title LIKE ? OR p.proposal_no LIKE ?)";
@@ -29,7 +35,13 @@ $stmt = $db->prepare($sql); $stmt->execute($params);
 $proposals = $stmt->fetchAll();
 
 $projects = $db->query("SELECT id,name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
-$counts   = $db->query("SELECT status, COUNT(*) cnt FROM proposals GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+if ($isCsm) {
+    $cntStmt = $db->prepare("SELECT status, COUNT(*) cnt FROM proposals WHERE created_by = ? GROUP BY status");
+    $cntStmt->execute([$user['id']]);
+    $counts = $cntStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+} else {
+    $counts   = $db->query("SELECT status, COUNT(*) cnt FROM proposals GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
+}
 
 $pageTitle = 'Proposals';
 include __DIR__ . '/../../includes/header.php';
