@@ -168,6 +168,10 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
+.top-navbar-user::after {
+  display: none !important;
+}
+
 .top-navbar-user:hover {
   background: #f8fafc;
   border-color: #cbd5e1;

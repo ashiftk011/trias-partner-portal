@@ -1,9 +1,10 @@
 <?php
 /**
- * Instagram & Meta Lead Ads Webhook API Endpoint
+ * Meta (Facebook & Instagram Lead Ads) & Custom Webhook API Endpoint
  * 
- * Automatically captures leads submitted via Instagram Ads, Facebook Lead Ads,
- * Zapier, Make.com, Pabbly Connect, or custom Webhooks.
+ * Handshakes Meta webhook setup requests (GET)
+ * Processes Meta real-time lead notifications (POST with leadgen_id)
+ * Supports direct third-party lead webhooks (Zapier, Make, Pabbly)
  */
 
 header('Content-Type: application/json');
@@ -18,8 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php'; // For generateCode()
+require_once __DIR__ . '/../../includes/meta_lead_service.php';
 
 $db = getDB();
+$metaService = new MetaLeadService($db);
 
 // 1. Meta Webhook Verification Handshake (GET Request)
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -28,15 +31,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $hubVerifyToken = $_GET['hub_verify_token'] ?? $_GET['hub.verify_token'] ?? '';
 
     if ($hubMode === 'subscribe' && !empty($hubChallenge)) {
-        // Return Meta verification challenge directly
+        $expectedToken = $metaService->getVerifyToken();
+        
+        // Validate verify_token if expected token is set
+        if (!empty($expectedToken) && $hubVerifyToken !== $expectedToken) {
+            http_response_code(403);
+            echo "Verification token mismatch.";
+            exit;
+        }
+
+        // Return Meta verification challenge as plain text
+        header('Content-Type: text/plain');
         echo $hubChallenge;
         exit;
     }
 
     echo json_encode([
         'status'  => 'online',
-        'service' => 'Instagram Lead Ads Webhook API',
-        'usage'   => 'POST lead JSON payload to this endpoint'
+        'service' => 'Meta (Facebook & Instagram) Lead Ads Webhook API',
+        'meta_configured' => $metaService->isConfigured(),
+        'usage'   => 'POST lead JSON payload or Meta leadgen webhook to this endpoint'
     ]);
     exit;
 }
@@ -51,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Get input data (JSON or Form-Data)
 $rawInput = file_get_contents('php://input');
 $input = $_POST;
+$decoded = null;
 if (!empty($rawInput)) {
     $decoded = json_decode($rawInput, true);
     if (is_array($decoded)) {
@@ -58,7 +73,62 @@ if (!empty($rawInput)) {
     }
 }
 
-// Map flexible key names from Instagram/Meta/Zapier/Make
+// Check if this is a Meta Graph API Webhook Event payload
+// Meta sends payload structure: entry[0].changes[0].value.leadgen_id
+$leadgenId = null;
+if (isset($decoded['entry']) && is_array($decoded['entry'])) {
+    foreach ($decoded['entry'] as $entry) {
+        if (isset($entry['changes']) && is_array($entry['changes'])) {
+            foreach ($entry['changes'] as $change) {
+                if (isset($change['value']['leadgen_id'])) {
+                    $leadgenId = (string)$change['value']['leadgen_id'];
+                    break 2;
+                }
+            }
+        }
+    }
+}
+
+// Option A: Real-Time Meta Leadgen Webhook Payload
+if ($leadgenId) {
+    try {
+        if (!$metaService->isConfigured()) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Received Meta webhook leadgen_id, but Meta Page Access Token is not configured in Settings.'
+            ]);
+            exit;
+        }
+
+        // Fetch lead details from Meta Graph API GET /{leadgen_id}
+        $metaLead = $metaService->fetchSingleLead($leadgenId);
+
+        // Save lead in database
+        $result = $metaService->saveLead($metaLead);
+
+        http_response_code(200);
+        echo json_encode([
+            'success'    => true,
+            'meta_flow'  => true,
+            'leadgen_id' => $leadgenId,
+            'status'     => $result['status'],
+            'lead_code'  => $result['lead_code'] ?? null,
+            'message'    => $result['message']
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to process Meta lead: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// Option B: Direct / Third-Party Payload (Zapier, Make, Custom Webhook)
 $name = trim($input['name'] ?? $input['full_name'] ?? (($input['first_name'] ?? '') . ' ' . ($input['last_name'] ?? '')));
 $phone = trim($input['phone'] ?? $input['phone_number'] ?? $input['mobile'] ?? $input['contact'] ?? '');
 $email = trim($input['email'] ?? $input['email_address'] ?? '');
@@ -68,7 +138,7 @@ $website = trim($input['website'] ?? '');
 $address = trim($input['address'] ?? $input['city'] ?? '');
 $source = !empty($input['source']) ? trim($input['source']) : 'social_media';
 
-// Project mapping (project_id or fallback to default first active project)
+// Project mapping
 $projectId = (int)($input['project_id'] ?? 0);
 if ($projectId <= 0 && !empty($input['project_name'])) {
     $pStmt = $db->prepare("SELECT id FROM projects WHERE name LIKE ? LIMIT 1");
@@ -76,11 +146,9 @@ if ($projectId <= 0 && !empty($input['project_name'])) {
     $projectId = (int)$pStmt->fetchColumn();
 }
 if ($projectId <= 0) {
-    // Default to the first active project if not explicitly supplied
-    $projectId = (int)$db->query("SELECT id FROM projects WHERE status='active' ORDER BY id ASC LIMIT 1")->fetchColumn();
+    $projectId = $metaService->getDefaultProjectId();
 }
 
-// Region mapping if provided
 $regionId = isset($input['region_id']) ? (int)$input['region_id'] : null;
 
 // Form / Ad details into Notes
@@ -104,21 +172,20 @@ if ($projectId <= 0) {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => 'No active project found to assign this lead to. Please create a project or pass project_id.'
+        'message' => 'No active project found to assign this lead to. Please create a project or configure default project in Settings.'
     ]);
     exit;
 }
 
 try {
-    // Generate unique Lead Code
     $leadCode = generateCode('LD', 'leads', 'lead_code');
+    $assignedTo = $metaService->getDefaultAssignedTo() > 0 ? $metaService->getDefaultAssignedTo() : null;
 
-    // Insert lead into database
     $query = "INSERT INTO leads (
                 lead_code, project_id, region_id, name, email,
                 phone, company, designation, website, address,
-                source, status, notes, created_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, NOW())";
+                source, status, assigned_to, notes, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, NOW())";
 
     $stmt = $db->prepare($query);
     $stmt->execute([
@@ -133,6 +200,7 @@ try {
         $website,
         $address,
         $source,
+        $assignedTo,
         $notes
     ]);
 
@@ -141,7 +209,7 @@ try {
     http_response_code(201);
     echo json_encode([
         'success'   => true,
-        'message'   => 'Instagram lead recorded automatically.',
+        'message'   => 'Instagram/Meta lead recorded automatically.',
         'lead_id'   => (int)$insertedId,
         'lead_code' => $leadCode,
         'name'      => $name,

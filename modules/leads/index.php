@@ -104,8 +104,11 @@ include __DIR__ . '/../../includes/header.php';
   <div><h4 class="mb-0">Leads Management</h4><p class="text-muted small mb-0">Track and manage all client leads with automated Instagram sync</p></div>
   <?php if (!$isInvestor): ?>
   <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-danger" id="btnSyncMetaLeadsDirect">
+      <i class="bi bi-arrow-repeat me-1"></i>Sync Meta Leads
+    </button>
     <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#instagramModal">
-      <i class="bi bi-instagram me-1"></i>Instagram Auto-Sync
+      <i class="bi bi-instagram me-1"></i>Meta Webhook & Setup
     </button>
     <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#csvModal">
       <i class="bi bi-file-earmark-arrow-up me-1"></i>Import CSV
@@ -753,6 +756,38 @@ function confirmBulkDelete() {
 <?php endif; ?>
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Direct Meta Leads Sync Action
+  $('#btnSyncMetaLeadsDirect').on('click', function() {
+    const $btn = $(this);
+    const origHtml = $btn.html();
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Syncing Meta...');
+
+    $.ajax({
+      url: '<?= BASE_URL ?>/api/sync_meta_leads.php?action=sync',
+      method: 'GET',
+      dataType: 'json',
+      success: function(res) {
+        $btn.prop('disabled', false).html(origHtml);
+        if (res && res.success) {
+          alert('SUCCESS: ' + res.message);
+          window.location.reload();
+        } else {
+          alert('Error: ' + (res.message || 'Meta sync failed.'));
+        }
+      },
+      error: function(xhr) {
+        $btn.prop('disabled', false).html(origHtml);
+        const res = xhr.responseJSON || {};
+        const msg = res.message || xhr.responseText || 'Connection failed.';
+        if (res.token_expired || msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('token')) {
+          alert("⚠️ META ACCESS TOKEN EXPIRED!\n\n" + msg + "\n\nPlease go to Settings -> System Settings to paste a new valid Page Access Token.");
+        } else {
+          alert("Sync Error: " + msg);
+        }
+      }
+    });
+  });
+
   // Handle status selection change
   $('#lStatus').on('change', function() {
     const status = this.value;

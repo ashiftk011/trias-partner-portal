@@ -108,7 +108,7 @@ function getFlash(string $type): string {
 }
 
 function displayFlash(): void {
-    foreach (['success', 'error', 'warning', 'info'] as $type) {
+    foreach (['success', 'error', 'danger', 'warning', 'info'] as $type) {
         $msg = getFlash($type);
         if ($msg) {
             if ($type === 'error') {
@@ -156,9 +156,9 @@ function displayFlash(): void {
                         }
                       </script>";
             } else {
-                $cls = ['success'=>'success','warning'=>'warning','info'=>'info'][$type];
+                $cls = ['success'=>'success','danger'=>'danger','warning'=>'warning','info'=>'info'][$type] ?? 'secondary';
                 echo "<div class='alert alert-{$cls} alert-dismissible fade show' role='alert'>
-                        <i class='bi bi-" . ($type==='success'?'check-circle':'exclamation-circle') . "-fill me-2'></i>"
+                        <i class='bi bi-" . ($type==='success'?'check-circle':'exclamation-triangle') . "-fill me-2'></i>"
                         . htmlspecialchars($msg) . "
                         <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
                       </div>";

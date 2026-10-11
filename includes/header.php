@@ -41,7 +41,7 @@ $currentUser = currentUser();
         <i class="bi bi-calendar-event me-2 text-primary"></i><?= date('D, d M Y') ?>
       </span>
       <div class="dropdown">
-        <button class="top-navbar-user dropdown-toggle" data-bs-toggle="dropdown">
+        <button class="top-navbar-user" data-bs-toggle="dropdown">
           <div class="top-navbar-avatar-wrap">
             <div class="top-navbar-avatar"><?= strtoupper(substr($currentUser['name'], 0, 1)) ?></div>
             <span class="top-navbar-avatar-status"></span>

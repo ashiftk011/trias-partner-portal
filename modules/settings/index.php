@@ -1,15 +1,60 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/meta_lead_service.php';
 requireAccess('settings');
 
 $db = getDB();
+$metaService = new MetaLeadService($db);
 
 // Handle save
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
     $action = $_POST['action'] ?? 'save_settings';
+
+    // Auto-save Meta settings if supplied in POST for test/subscribe/sync actions
+    if (in_array($action, ['test_meta', 'subscribe_meta', 'sync_meta'])) {
+        $metaFields = ['meta_access_token','meta_page_id','meta_verify_token','meta_default_project_id','meta_default_assigned_to'];
+        foreach ($metaFields as $key) {
+            if (isset($_POST[$key])) {
+                $val = trim($_POST[$key]);
+                $db->prepare("INSERT INTO app_settings (setting_key, setting_value) VALUES (?,?) ON DUPLICATE KEY UPDATE setting_value=?")
+                   ->execute([$key, $val, $val]);
+            }
+        }
+        $metaService->loadSettings();
+    }
+
+    if ($action === 'test_meta') {
+        try {
+            $info = $metaService->fetchPageInfo();
+            setFlash('success', "Meta Connection Successful! Connected to Facebook Page: " . htmlspecialchars($info['name'] ?? '') . " (ID: " . htmlspecialchars($info['id'] ?? '') . ")");
+        } catch (Exception $e) {
+            setFlash('error', "Meta Connection Error: " . $e->getMessage());
+        }
+        redirect(BASE_URL . '/modules/settings/index.php#meta-settings');
+    }
+
+    if ($action === 'subscribe_meta') {
+        try {
+            $res = $metaService->subscribeAppToPage();
+            setFlash('success', "Page Webhook Subscribed! Facebook Page is now subscribed to real-time Leadgen Webhooks.");
+        } catch (Exception $e) {
+            setFlash('error', "Meta Subscription Error: " . $e->getMessage());
+        }
+        redirect(BASE_URL . '/modules/settings/index.php#meta-settings');
+    }
+
+    if ($action === 'sync_meta') {
+        try {
+            $sum = $metaService->syncAllLeads();
+            setFlash('success', "Meta Leads Sync Completed! Scanned {$sum['forms_scanned']} forms, found {$sum['total_leads_found']} leads. Imported {$sum['imported']} new leads ({$sum['duplicates']} duplicates skipped).");
+        } catch (Exception $e) {
+            setFlash('error', "Meta Sync Error: " . $e->getMessage());
+        }
+        redirect(BASE_URL . '/modules/settings/index.php#meta-settings');
+    }
 
     if ($action === 'send_test_email') {
         require_once __DIR__ . '/../../includes/mailer.php';
@@ -38,7 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $fields = [
         'app_name','company_name','company_address','company_email','company_phone','company_website',
-        'smtp_host','smtp_port','smtp_username','smtp_password','smtp_encryption','smtp_from_email','smtp_from_name'
+        'smtp_host','smtp_port','smtp_username','smtp_password','smtp_encryption','smtp_from_email','smtp_from_name',
+        'meta_access_token','meta_page_id','meta_verify_token','meta_default_project_id','meta_default_assigned_to'
     ];
     foreach ($fields as $key) {
         $value = trim($_POST[$key] ?? '');
@@ -114,6 +160,8 @@ $settings = [];
 foreach ($db->query("SELECT setting_key, setting_value FROM app_settings")->fetchAll() as $row) {
     $settings[$row['setting_key']] = $row['setting_value'];
 }
+$allProjects = $db->query("SELECT id, name FROM projects WHERE status='active' ORDER BY name")->fetchAll();
+$allUsers    = $db->query("SELECT id, name, role FROM users WHERE status='active' ORDER BY name")->fetchAll();
 
 $pageTitle = 'Company Settings';
 include __DIR__ . '/../../includes/header.php';
@@ -242,6 +290,77 @@ include __DIR__ . '/../../includes/header.php';
             <div class="col-md-4">
               <label class="form-label fw-semibold small">Sender Display Name</label>
               <input type="text" name="smtp_from_name" class="form-control" value="<?= htmlspecialchars($settings['smtp_from_name'] ?? '') ?>" placeholder="e.g. Trias HR Portal">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Meta (Facebook & Instagram) Lead Ads Integration Card -->
+      <div class="card border-0 shadow-sm mt-4" id="meta-settings">
+        <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-meta me-2 text-danger"></i>Meta (Facebook & Instagram) Lead Ads Integration
+          </span>
+          <div class="d-flex gap-2">
+            <button type="button" onclick="submitMetaAction('test')" class="btn btn-sm btn-outline-primary" title="Test Token & Fetch Page Info">
+              <i class="bi bi-box-arrow-in-up-right me-1"></i>Test Token
+            </button>
+            <button type="button" onclick="submitMetaAction('sync')" class="btn btn-sm btn-success" title="Sync All Lead Forms & Leads Now">
+              <i class="bi bi-arrow-repeat me-1"></i>Sync Leads Now
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Page Access Token (Facebook Graph API v21.0) *</label>
+              <textarea name="meta_access_token" class="form-control font-monospace form-control-sm" rows="2" placeholder="EAA... (Paste Long-lived Page Access Token or System User Token)"><?= htmlspecialchars($settings['meta_access_token'] ?? '') ?></textarea>
+              <div class="form-text micro-text">Requires <code>leads_retrieval</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>pages_manage_metadata</code>, and <code>ads_management</code> permissions.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Facebook Page ID *</label>
+              <input type="text" name="meta_page_id" class="form-control form-control-sm" value="<?= htmlspecialchars($settings['meta_page_id'] ?? '') ?>" placeholder="e.g. 102938475610293">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Webhook Verify Token</label>
+              <input type="text" name="meta_verify_token" class="form-control form-control-sm" value="<?= htmlspecialchars($settings['meta_verify_token'] ?? 'trias_meta_lead_verify_token') ?>" placeholder="trias_meta_lead_verify_token">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Default Lead Project Assignment</label>
+              <select name="meta_default_project_id" class="form-select form-select-sm">
+                <option value="0">-- Select Project --</option>
+                <?php foreach ($allProjects as $proj): ?>
+                  <option value="<?= $proj['id'] ?>" <?= (int)($settings['meta_default_project_id'] ?? 0) === (int)$proj['id'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($proj['name']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Default Assigned Telecaller / Agent</label>
+              <select name="meta_default_assigned_to" class="form-select form-select-sm">
+                <option value="0">-- Unassigned --</option>
+                <?php foreach ($allUsers as $u): ?>
+                  <option value="<?= $u['id'] ?>" <?= (int)($settings['meta_default_assigned_to'] ?? 0) === (int)$u['id'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($u['name']) ?> (<?= ucfirst($u['role']) ?>)
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12 mt-3 pt-2 border-top">
+              <label class="form-label fw-semibold small">Real-Time Webhook Callback URL</label>
+              <div class="input-group input-group-sm mb-2">
+                <input type="text" class="form-control font-monospace bg-light" id="metaWebhookUrlSetting" value="<?= BASE_URL ?>/api/webhooks/instagram_lead.php" readonly>
+                <button type="button" class="btn btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('metaWebhookUrlSetting').value); alert('Webhook URL copied!');">
+                  <i class="bi bi-clipboard me-1"></i>Copy Webhook URL
+                </button>
+              </div>
+              <div class="d-flex justify-content-between align-items-center text-muted micro-text">
+                <span>Last Synced: <strong><?= !empty($settings['meta_last_sync_time']) ? date('d M Y, h:i A', strtotime($settings['meta_last_sync_time'])) : 'Never' ?></strong></span>
+                <button type="button" onclick="submitMetaAction('subscribe')" class="btn btn-link btn-sm p-0 text-decoration-none micro-text">
+                  <i class="bi bi-bell-fill me-1"></i>Auto-Subscribe Page to Webhooks
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -381,5 +500,52 @@ include __DIR__ . '/../../includes/header.php';
     </div>
   </div>
 </div>
+
+<!-- Hidden forms for Meta Actions -->
+<form id="metaTestForm" method="POST" class="d-none">
+  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="action" value="test_meta">
+</form>
+<form id="metaSubscribeForm" method="POST" class="d-none">
+  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="action" value="subscribe_meta">
+</form>
+<form id="metaSyncForm" method="POST" class="d-none">
+  <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="action" value="sync_meta">
+</form>
+
+<script>
+function submitMetaAction(actionName) {
+  const formId = actionName === 'test' ? 'metaTestForm' : (actionName === 'subscribe' ? 'metaSubscribeForm' : 'metaSyncForm');
+  const form = document.getElementById(formId);
+  if (!form) return;
+
+  const metaToken = document.querySelector('[name="meta_access_token"]')?.value || '';
+  const metaPage  = document.querySelector('[name="meta_page_id"]')?.value || '';
+  const metaVerify= document.querySelector('[name="meta_verify_token"]')?.value || '';
+  const metaProj  = document.querySelector('[name="meta_default_project_id"]')?.value || '';
+  const metaUser  = document.querySelector('[name="meta_default_assigned_to"]')?.value || '';
+
+  function addHidden(f, name, val) {
+    let inp = f.querySelector(`input[name="${name}"]`);
+    if (!inp) {
+      inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = name;
+      f.appendChild(inp);
+    }
+    inp.value = val;
+  }
+
+  addHidden(form, 'meta_access_token', metaToken);
+  addHidden(form, 'meta_page_id', metaPage);
+  addHidden(form, 'meta_verify_token', metaVerify);
+  addHidden(form, 'meta_default_project_id', metaProj);
+  addHidden(form, 'meta_default_assigned_to', metaUser);
+
+  form.submit();
+}
+</script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
