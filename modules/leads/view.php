@@ -33,7 +33,8 @@ if (empty($lead['is_viewed'])) {
 }
 
 $isAdmin = isRole('admin');
-$canDelete = $isAdmin && $lead['status'] === 'not_interested';
+$isInvestor = isRole('investor');
+$canDelete = $isAdmin && in_array($lead['status'], ['not_interested', 'false_lead']);
 
 // If converted, find the linked client
 $linkedClient = null;
@@ -112,6 +113,11 @@ include __DIR__ . '/../../includes/header.php';
   </a>
   <?php endif; ?>
   <span class="badge bg-success fs-6 p-2"><i class="bi bi-check-circle me-1"></i>Converted</span>
+  <?php endif; ?>
+  <?php if (!$isInvestor && $lead['status'] !== 'converted' && $lead['status'] !== 'false_lead'): ?>
+  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#markFalseModal">
+    <i class="bi bi-x-octagon me-1"></i>Mark as False Lead
+  </button>
   <?php endif; ?>
   <?php if ($canDelete): ?>
   <form method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this lead? This action cannot be undone.')">
@@ -255,6 +261,7 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="not_interested">Not Interested</option>
                 <option value="follow_up">Follow Up</option>
                 <option value="converted">Converted</option>
+                <option value="false_lead">False Lead</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -391,5 +398,46 @@ function togglePassword() {
   }
 }
 </script>
+
+<!-- Mark False Lead Modal -->
+<div class="modal fade" id="markFalseModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="<?= BASE_URL ?>/modules/leads/mark_false.php">
+        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        <input type="hidden" name="redirect_to" value="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $id ?>">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-x-octagon text-danger me-2"></i>Mark as False Lead</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3">Are you sure you want to mark <strong><?= htmlspecialchars($lead['name']) ?></strong> as a <strong>False Lead</strong>?</p>
+          <div class="mb-3">
+            <label class="form-label">Reason <span class="text-muted">(Optional)</span></label>
+            <select name="reason" class="form-select">
+              <option value="">-- Select Reason --</option>
+              <option value="Invalid Phone / Contact Number">Invalid Phone / Contact Number</option>
+              <option value="Fake / Spam Inquiry">Fake / Spam Inquiry</option>
+              <option value="Wrong Location / Out of Service Area">Wrong Location / Out of Service Area</option>
+              <option value="Irrelevant / Student / Job Seeker">Irrelevant / Student / Job Seeker</option>
+              <option value="Duplicate Lead">Duplicate Lead</option>
+              <option value="Not Reachable / Disconnected">Not Reachable / Disconnected</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Additional Notes <span class="text-muted">(Optional)</span></label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Any details explaining why this lead is false..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-x-octagon me-1"></i>Confirm Mark as False</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>

@@ -82,6 +82,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $initialStatus = 'pending';
     }
 
+    // Generate or validate invoice number
+    $customInvNo = trim($_POST['invoice_no'] ?? '');
+    if ($customInvNo !== '') {
+        $chk = $db->prepare("SELECT id FROM invoices WHERE invoice_no = ?");
+        $chk->execute([$customInvNo]);
+        if ($chk->fetch()) {
+            setFlash('error', "Invoice number '{$customInvNo}' already exists. Please choose a different number.");
+            redirect(BASE_URL . '/modules/invoices/save.php?client_id=' . $clientId);
+        }
+        $invoiceNo = $customInvNo;
+    } else {
+        $lastInv = $db->query("SELECT invoice_no FROM invoices WHERE invoice_no REGEXP '^INV-[0-9]+$' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        $num = ($lastInv && preg_match('/INV-(\d+)/i', $lastInv, $m)) ? (int)$m[1] + 1 : 1;
+        $invoiceNo = 'INV-' . str_pad($num, 5, '0', STR_PAD_LEFT);
+
+        $chk = $db->prepare("SELECT id FROM invoices WHERE invoice_no = ?");
+        while (true) {
+            $chk->execute([$invoiceNo]);
+            if (!$chk->fetch()) break;
+            $num++;
+            $invoiceNo = 'INV-' . str_pad($num, 5, '0', STR_PAD_LEFT);
+        }
+    }
+
     $db->prepare("INSERT INTO invoices (invoice_no,client_id,renewal_id,invoice_date,due_date,subtotal,discount_type,discount_percent,discount_amount,tax_percent,tax_amount,total_amount,advance_amount,advance_date,paid_amount,status,notes,terms_conditions,currency,created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?)")
        ->execute([$invoiceNo,$clientId,$renewalId,$invDate,$dueDate,$subtotal,$discountType,$discountPercent,$discountAmount,$taxPercent,$taxAmount,$totalAmount,$advanceAmount,$advanceDate,$initialStatus,$notes,$termsConditions,$currency,$userId]);
 
@@ -104,6 +128,17 @@ if ($preClientId) {
     $rStmt = $db->prepare("SELECT id,plan_id,start_date,end_date,amount FROM renewals WHERE client_id=? AND status='active' ORDER BY end_date DESC");
     $rStmt->execute([$preClientId]);
     $renewals = $rStmt->fetchAll();
+}
+
+$lastInv = $db->query("SELECT invoice_no FROM invoices WHERE invoice_no REGEXP '^INV-[0-9]+$' ORDER BY id DESC LIMIT 1")->fetchColumn();
+$num = ($lastInv && preg_match('/INV-(\d+)/i', $lastInv, $m)) ? (int)$m[1] + 1 : 1;
+$suggestedInvoiceNo = 'INV-' . str_pad($num, 5, '0', STR_PAD_LEFT);
+$chk = $db->prepare("SELECT id FROM invoices WHERE invoice_no = ?");
+while (true) {
+    $chk->execute([$suggestedInvoiceNo]);
+    if (!$chk->fetch()) break;
+    $num++;
+    $suggestedInvoiceNo = 'INV-' . str_pad($num, 5, '0', STR_PAD_LEFT);
 }
 
 $pageTitle = 'Create Invoice';
@@ -162,6 +197,11 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="<?= $code ?>"><?= $code ?> &mdash; <?= htmlspecialchars($info['name']) ?></option>
                 <?php endforeach; ?>
               </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Invoice Number</label>
+              <input type="text" name="invoice_no" class="form-control" placeholder="<?= htmlspecialchars($suggestedInvoiceNo) ?>" value="">
+              <div class="form-text">Leave blank to auto-generate (Next: <?= htmlspecialchars($suggestedInvoiceNo) ?>).</div>
             </div>
           </div>
 

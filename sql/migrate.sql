@@ -688,8 +688,15 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_
 ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS account_id INT NULL AFTER payment_mode;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS advance_account_id INT NULL AFTER advance_date;
 
--- Migration: Track creator on leads and clients for CSM scoped visibility
-ALTER TABLE leads ADD COLUMN IF NOT EXISTS created_by INT NULL AFTER assigned_to;
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS created_by INT NULL AFTER status;
+-- Migration: Support contract and freelance employees in HR portal
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS employment_type ENUM('full_time', 'contract', 'freelance', 'intern') NOT NULL DEFAULT 'full_time' AFTER department;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_start_date DATE NULL AFTER joining_date;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_end_date DATE NULL AFTER contract_start_date;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_rate_type ENUM('monthly', 'hourly', 'fixed_project', 'daily') DEFAULT 'monthly' AFTER contract_end_date;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_rate DECIMAL(10,2) DEFAULT 0.00 AFTER contract_rate_type;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_terms TEXT NULL AFTER contract_rate;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS gst_no VARCHAR(25) NULL AFTER pan_no;
 
-
+-- Migration: Add false_lead status to leads and lead_responses
+ALTER TABLE leads MODIFY COLUMN status ENUM('new','contacted','interested','not_interested','follow_up','converted','trial','trial_ended','false_lead') DEFAULT 'new';
+ALTER TABLE lead_responses MODIFY COLUMN status_updated ENUM('new','contacted','interested','not_interested','follow_up','converted','trial','trial_ended','false_lead') NULL;

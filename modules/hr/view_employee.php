@@ -42,10 +42,11 @@ include __DIR__ . '/../../includes/header.php';
     </div>
   </div>
   <div class="d-flex gap-2 align-items-center">
+    <?= employmentTypeBadge($employee['employment_type'] ?? 'full_time') ?>
     <?= statusBadge($employee['status']) ?>
-    <a href="<?= BASE_URL ?>/modules/hr/save_employee.php?id=<?= $id ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit / Revise Salary</a>
+    <a href="<?= BASE_URL ?>/modules/hr/save_employee.php?id=<?= $id ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil me-1"></i>Edit Personnel / Terms</a>
     <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#verifySalaryModal">
-      <i class="bi bi-receipt me-1"></i>Verify & Process Salary
+      <i class="bi bi-receipt me-1"></i><?= in_array($employee['employment_type'] ?? '', ['contract','freelance']) ? 'Process Retainer Payout' : 'Verify & Process Salary' ?>
     </button>
   </div>
 </div>
@@ -58,6 +59,10 @@ include __DIR__ . '/../../includes/header.php';
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-person me-2 text-primary"></i>Personal & Work Info</div>
       <div class="card-body">
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Employment Type</span>
+          <div><?= employmentTypeBadge($employee['employment_type'] ?? 'full_time') ?></div>
+        </div>
         <?php
         $info = [
           'Emp Code'     => $employee['emp_number'],
@@ -77,6 +82,58 @@ include __DIR__ . '/../../includes/header.php';
       </div>
     </div>
 
+    <!-- Contract & Freelance Agreement Card -->
+    <?php if (in_array($employee['employment_type'] ?? '', ['contract', 'freelance'])): ?>
+      <?php
+      $daysLeft = null;
+      if (!empty($employee['contract_end_date'])) {
+          $endTs = strtotime($employee['contract_end_date']);
+          $nowTs = strtotime(date('Y-m-d'));
+          $daysLeft = (int)round(($endTs - $nowTs) / 86400);
+      }
+      ?>
+      <div class="card border-0 shadow-sm mb-4 border-start border-4 border-warning">
+        <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+          <span class="text-warning-emphasis"><i class="bi bi-briefcase-fill me-2 text-warning"></i>Contract & Retainer Terms</span>
+          <?php if ($daysLeft !== null): ?>
+            <?php if ($daysLeft < 0): ?>
+              <span class="badge bg-danger">Contract Expired</span>
+            <?php elseif ($daysLeft <= 30): ?>
+              <span class="badge bg-warning text-dark"><?= $daysLeft ?> Days Left</span>
+            <?php else: ?>
+              <span class="badge bg-success"><?= $daysLeft ?> Days Left</span>
+            <?php endif; ?>
+          <?php else: ?>
+            <span class="badge bg-light text-muted border">Ongoing Retainer</span>
+          <?php endif; ?>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between border-bottom py-2">
+            <span class="text-muted small">Contract Start</span>
+            <span class="fw-semibold small"><?= date('d M Y', strtotime($employee['contract_start_date'] ?: $employee['joining_date'])) ?></span>
+          </div>
+          <div class="d-flex justify-content-between border-bottom py-2">
+            <span class="text-muted small">Contract End</span>
+            <span class="fw-semibold small"><?= !empty($employee['contract_end_date']) ? date('d M Y', strtotime($employee['contract_end_date'])) : '<span class="text-muted">Indefinite / Ongoing</span>' ?></span>
+          </div>
+          <div class="d-flex justify-content-between border-bottom py-2">
+            <span class="text-muted small">Billing Model</span>
+            <span class="fw-semibold small text-capitalize"><?= str_replace('_', ' ', $employee['contract_rate_type'] ?? 'monthly') ?></span>
+          </div>
+          <div class="d-flex justify-content-between border-bottom py-2">
+            <span class="text-muted small">Agreed Rate / Fee</span>
+            <span class="fw-bold small text-success">₹<?= number_format((float)($employee['contract_rate'] ?? 0), 2) ?></span>
+          </div>
+          <?php if (!empty($employee['contract_terms'])): ?>
+            <div class="pt-2">
+              <span class="text-muted small d-block mb-1">Deliverables & Scope Terms:</span>
+              <div class="p-2 bg-light rounded small text-secondary border"><?= nl2br(htmlspecialchars($employee['contract_terms'])) ?></div>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-bank me-2 text-primary"></i>Bank & Statutory Details</div>
       <div class="card-body">
@@ -87,6 +144,9 @@ include __DIR__ . '/../../includes/header.php';
           'IFSC Code'      => $employee['ifsc_code'] ?: '-',
           'PAN Number'     => $employee['pan_no'] ?: '-',
         ];
+        if (!empty($employee['gst_no'])) {
+            $bankInfo['GST Number'] = $employee['gst_no'];
+        }
         foreach ($bankInfo as $label => $val): ?>
         <div class="d-flex justify-content-between border-bottom py-2">
           <span class="text-muted small"><?= $label ?></span>
@@ -102,7 +162,7 @@ include __DIR__ . '/../../includes/header.php';
     <!-- Monthly Salary Breakdown -->
     <div class="card border-0 shadow-sm mb-4">
       <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-calculator me-2 text-primary"></i>Current Configured Salary Structure</span>
+        <span><i class="bi bi-calculator me-2 text-primary"></i>Current Configured <?= in_array($employee['employment_type'] ?? '', ['contract','freelance']) ? 'Retainer / Payout Structure' : 'Salary Structure' ?></span>
         <a href="<?= BASE_URL ?>/modules/hr/save_employee.php?id=<?= $id ?>" class="btn btn-sm btn-link text-decoration-none p-0"><i class="bi bi-pencil"></i> Modify / Add Increment</a>
       </div>
       <div class="card-body">
@@ -110,26 +170,27 @@ include __DIR__ . '/../../includes/header.php';
           <?php
           $gross = ($struct['basic_salary'] + $struct['hra'] + $struct['conveyance'] + $struct['special_allowance']);
           $deductions = ($struct['pf_deduction'] + $struct['tds_deduction'] + $struct['other_deductions']);
+          $isContractor = in_array($employee['employment_type'] ?? '', ['contract', 'freelance']);
           ?>
           <div class="row g-4">
             <div class="col-md-6 border-end">
-              <h6 class="fw-bold text-success mb-3"><i class="bi bi-plus-circle me-1"></i>Monthly Earnings</h6>
-              <div class="d-flex justify-content-between border-bottom py-1 small"><span>Basic Salary</span><span class="fw-semibold">₹<?= number_format($struct['basic_salary'], 2) ?></span></div>
+              <h6 class="fw-bold text-success mb-3"><i class="bi bi-plus-circle me-1"></i><?= $isContractor ? 'Monthly Retainer / Earnings' : 'Monthly Earnings' ?></h6>
+              <div class="d-flex justify-content-between border-bottom py-1 small"><span><?= $isContractor ? 'Basic Retainer / Fee' : 'Basic Salary' ?></span><span class="fw-semibold">₹<?= number_format($struct['basic_salary'], 2) ?></span></div>
               <div class="d-flex justify-content-between border-bottom py-1 small"><span>HRA</span><span class="fw-semibold">₹<?= number_format($struct['hra'], 2) ?></span></div>
               <div class="d-flex justify-content-between border-bottom py-1 small"><span>Conveyance</span><span class="fw-semibold">₹<?= number_format($struct['conveyance'], 2) ?></span></div>
               <div class="d-flex justify-content-between border-bottom py-1 small"><span>Special Allowance</span><span class="fw-semibold">₹<?= number_format($struct['special_allowance'], 2) ?></span></div>
-              <div class="d-flex justify-content-between pt-2 fw-bold text-dark"><span>Gross Monthly Earnings</span><span>₹<?= number_format($gross, 2) ?></span></div>
+              <div class="d-flex justify-content-between pt-2 fw-bold text-dark"><span>Total Monthly Gross</span><span>₹<?= number_format($gross, 2) ?></span></div>
             </div>
             <div class="col-md-6">
               <h6 class="fw-bold text-danger mb-3"><i class="bi bi-dash-circle me-1"></i>Monthly Deductions</h6>
               <div class="d-flex justify-content-between border-bottom py-1 small"><span>PF Deduction</span><span class="fw-semibold">₹<?= number_format($struct['pf_deduction'], 2) ?></span></div>
-              <div class="d-flex justify-content-between border-bottom py-1 small"><span>TDS / Income Tax</span><span class="fw-semibold">₹<?= number_format($struct['tds_deduction'], 2) ?></span></div>
+              <div class="d-flex justify-content-between border-bottom py-1 small"><span>TDS / Withholding Tax</span><span class="fw-semibold">₹<?= number_format($struct['tds_deduction'], 2) ?></span></div>
               <div class="d-flex justify-content-between border-bottom py-1 small"><span>Other Deductions</span><span class="fw-semibold">₹<?= number_format($struct['other_deductions'], 2) ?></span></div>
               <div class="d-flex justify-content-between pt-2 fw-bold text-danger"><span>Total Deductions</span><span>₹<?= number_format($deductions, 2) ?></span></div>
             </div>
           </div>
           <div class="alert alert-success d-flex justify-content-between align-items-center mt-3 mb-0 py-2">
-            <span class="fw-semibold">Net Take-Home Monthly Salary</span>
+            <span class="fw-semibold"><?= $isContractor ? 'Net Monthly Take-Home Retainer' : 'Net Take-Home Monthly Salary' ?></span>
             <span class="fs-5 fw-bold">₹<?= number_format($struct['net_salary'], 2) ?></span>
           </div>
         <?php else: ?>

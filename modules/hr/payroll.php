@@ -6,9 +6,12 @@ requireAccess('hr');
 
 $db = getDB();
 
-$filterMonth = isset($_GET['month']) ? (int)$_GET['month'] : 0;
-$filterYear  = (int)($_GET['year'] ?? date('Y'));
-$filterEmpId = (int)($_GET['employee_id'] ?? 0);
+restorePageFilters('payroll', ['month', 'year', 'employee_id', 'employment_type']);
+
+$filterMonth   = isset($_GET['month']) ? (int)$_GET['month'] : 0;
+$filterYear    = (int)($_GET['year'] ?? date('Y'));
+$filterEmpId   = (int)($_GET['employee_id'] ?? 0);
+$filterEmpType = $_GET['employment_type'] ?? '';
 
 // Fetch all active employees for processing modal dropdown
 $empListStmt = $db->query("SELECT e.*, s.basic_salary, s.hra, s.conveyance, s.special_allowance, s.pf_deduction, s.tds_deduction, s.other_deductions, s.net_salary FROM employees e LEFT JOIN salary_structures s ON s.employee_id=e.id WHERE e.status='active' ORDER BY e.name");
@@ -295,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch payments query
-$sql = "SELECT sp.*, e.name as employee_name, e.emp_number, e.designation, e.department, u.name as created_by_name
+$sql = "SELECT sp.*, e.name as employee_name, e.emp_number, e.designation, e.department, e.employment_type, u.name as created_by_name
         FROM salary_payments sp
         JOIN employees e ON e.id = sp.employee_id
         LEFT JOIN users u ON u.id = sp.created_by
@@ -313,6 +316,12 @@ if ($filterYear) {
 if ($filterEmpId) {
     $sql .= " AND sp.employee_id = ?";
     $params[] = $filterEmpId;
+}
+if ($filterEmpType === 'contractors') {
+    $sql .= " AND e.employment_type IN ('contract', 'freelance')";
+} elseif ($filterEmpType) {
+    $sql .= " AND e.employment_type = ?";
+    $params[] = $filterEmpType;
 }
 $sql .= " ORDER BY sp.year DESC, sp.month DESC, sp.id DESC";
 
@@ -391,7 +400,7 @@ include __DIR__ . '/../../includes/header.php';
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body py-2">
     <form method="GET" class="row g-2 align-items-end">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small fw-semibold mb-1">Month</label>
         <select name="month" class="form-select form-select-sm">
           <option value="0">All Months</option>
@@ -400,7 +409,7 @@ include __DIR__ . '/../../includes/header.php';
           <?php endforeach; ?>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small fw-semibold mb-1">Year</label>
         <select name="year" class="form-select form-select-sm">
           <?php for ($y = date('Y'); $y >= 2020; $y--): ?>
@@ -408,19 +417,30 @@ include __DIR__ . '/../../includes/header.php';
           <?php endfor; ?>
         </select>
       </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold mb-1">Employee Filter</label>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Personnel Filter</label>
         <select name="employee_id" class="form-select form-select-sm">
-          <option value="0">All Employees</option>
+          <option value="0">All Personnel</option>
           <?php foreach ($allEmployees as $empOpt): ?>
             <option value="<?= $empOpt['id'] ?>" <?= $filterEmpId===$empOpt['id']?'selected':'' ?>><?= htmlspecialchars($empOpt['name']) ?> (<?= htmlspecialchars($empOpt['emp_number']) ?>)</option>
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Type Filter</label>
+        <select name="employment_type" class="form-select form-select-sm">
+          <option value="">All Workforce Types</option>
+          <option value="full_time" <?= $filterEmpType==='full_time'?'selected':'' ?>>Full-Time Staff</option>
+          <option value="contractors" <?= $filterEmpType==='contractors'?'selected':'' ?>>All Contract & Freelancers</option>
+          <option value="contract" <?= $filterEmpType==='contract'?'selected':'' ?>>Contract Staff</option>
+          <option value="freelance" <?= $filterEmpType==='freelance'?'selected':'' ?>>Freelance Consultants</option>
+          <option value="intern" <?= $filterEmpType==='intern'?'selected':'' ?>>Interns</option>
+        </select>
+      </div>
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>Filter</button>
-        <?php if ($filterMonth || $filterEmpId): ?>
-          <a href="?" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
+        <?php if ($filterMonth || $filterEmpId || $filterEmpType): ?>
+          <a href="?clear=1" class="btn btn-sm btn-outline-secondary ms-1">Reset</a>
         <?php endif; ?>
       </div>
     </form>
@@ -456,7 +476,10 @@ include __DIR__ . '/../../includes/header.php';
               <tr>
                 <td class="fw-bold font-monospace text-primary"><?= htmlspecialchars($p['slip_number']) ?></td>
                 <td>
-                  <div class="fw-semibold text-dark"><?= htmlspecialchars($p['employee_name']) ?></div>
+                  <div class="fw-semibold text-dark d-flex align-items-center gap-1 flex-wrap">
+                    <?= htmlspecialchars($p['employee_name']) ?>
+                    <?= employmentTypeBadge($p['employment_type'] ?? 'full_time') ?>
+                  </div>
                   <div class="small text-muted font-monospace"><?= htmlspecialchars($p['emp_number']) ?> — <?= htmlspecialchars($p['designation']) ?></div>
                 </td>
                 <td class="fw-semibold text-nowrap"><?= $monthNames[$p['month']] ?? $p['month'] ?> <?= $p['year'] ?></td>
@@ -533,7 +556,7 @@ include __DIR__ . '/../../includes/header.php';
                           data-other="<?= (float)($empOpt['other_deductions'] ?? 0) ?>"
                           data-net="<?= (float)($empOpt['net_salary'] ?? 0) ?>"
                           <?= $filterEmpId===$empOpt['id']?'selected':'' ?>>
-                    <?= htmlspecialchars($empOpt['name']) ?> (<?= htmlspecialchars($empOpt['emp_number']) ?>) — <?= htmlspecialchars($empOpt['designation']) ?>
+                    <?= htmlspecialchars($empOpt['name']) ?> (<?= htmlspecialchars($empOpt['emp_number']) ?>) [<?= ucfirst(str_replace('_',' ', $empOpt['employment_type'] ?? 'full_time')) ?>] — <?= htmlspecialchars($empOpt['designation']) ?>
                   </option>
                 <?php endforeach; ?>
               </select>
@@ -690,7 +713,8 @@ include __DIR__ . '/../../includes/header.php';
                       <span>
                         <strong class="text-dark"><?= htmlspecialchars($emp['name']) ?></strong>
                         <span class="text-muted font-monospace small"> (<?= htmlspecialchars($emp['emp_number']) ?>)</span>
-                        <span class="badge bg-light text-muted border ms-2"><?= htmlspecialchars($emp['designation']) ?></span>
+                        <?= employmentTypeBadge($emp['employment_type'] ?? 'full_time') ?>
+                        <span class="badge bg-light text-muted border ms-1"><?= htmlspecialchars($emp['designation']) ?></span>
                       </span>
                       <span class="fw-bold text-success small">Net: ₹<?= number_format((float)($emp['net_salary'] ?? 0), 2) ?></span>
                     </label>
@@ -717,6 +741,7 @@ include __DIR__ . '/../../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="action" value="edit">
         <input type="hidden" name="slip_id" id="edit_slip_id" value="0">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Draft Salary Slip (<span id="edit_slip_number"></span>)</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

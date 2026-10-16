@@ -42,8 +42,9 @@ $navSections = [
     [
         'title' => 'HR & PAYROLL',
         'items' => [
-            ['module'=>'hr', 'submodule'=>'employees', 'icon'=>'person-badge-fill','label'=>'Employees',   'url'=>BASE_URL.'/modules/hr/employees.php'],
-            ['module'=>'hr', 'submodule'=>'payroll',   'icon'=>'wallet2',          'label'=>'Salary & Slips','url'=>BASE_URL.'/modules/hr/payroll.php'],
+            ['module'=>'hr', 'submodule'=>'employees',   'icon'=>'person-badge-fill', 'label'=>'All Employees',        'url'=>BASE_URL.'/modules/hr/employees.php'],
+            ['module'=>'hr', 'submodule'=>'contractors', 'icon'=>'briefcase-fill',     'label'=>'Contract & Freelance', 'url'=>BASE_URL.'/modules/hr/employees.php?type=contractors'],
+            ['module'=>'hr', 'submodule'=>'payroll',     'icon'=>'wallet2',            'label'=>'Salary & Slips',      'url'=>BASE_URL.'/modules/hr/payroll.php'],
         ]
     ],
     [
@@ -117,7 +118,9 @@ try {
               if (isset($item['submodule'])) {
                   if ($activeModule === $item['module']) {
                       if ($item['submodule'] === 'employees') {
-                          $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']);
+                          $isActive = in_array($currentPageScript, ['employees.php', 'save_employee.php', 'view_employee.php', 'index.php']) && (($_GET['type'] ?? '') !== 'contractors');
+                      } elseif ($item['submodule'] === 'contractors') {
+                          $isActive = in_array($currentPageScript, ['employees.php']) && (($_GET['type'] ?? '') === 'contractors');
                       } elseif ($item['submodule'] === 'payroll') {
                           $isActive = in_array($currentPageScript, ['payroll.php', 'payslip.php']);
                       } elseif ($item['submodule'] === 'accounts') {

@@ -6,6 +6,8 @@ require_once __DIR__ . '/../../includes/accounting.php';
 
 requireAccess('accounts');
 
+restorePageFilters('accounts_reports', ['report', 'from_date', 'to_date', 'account_id']);
+
 $reportType = trim($_GET['report'] ?? 'cashbook');
 $fromDate   = trim($_GET['from_date'] ?? date('Y-m-01'));
 $toDate     = trim($_GET['to_date'] ?? date('Y-m-d'));

@@ -138,6 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Fetch categories
 $categories = $db->query("SELECT ec.*, COUNT(e.id) as expense_count, COALESCE(SUM(e.amount),0) as total_spent FROM expense_categories ec LEFT JOIN expenses e ON e.category_id=ec.id GROUP BY ec.id ORDER BY ec.name")->fetchAll();
 
+restorePageFilters('expenses', ['category_id', 'from_date', 'to_date', 'payment_mode', 'q']);
+
 // Filters for Expenses list
 $filterCategory = (int)($_GET['category_id'] ?? 0);
 $filterFrom     = trim($_GET['from_date'] ?? '');
@@ -286,7 +288,7 @@ include __DIR__ . '/../../includes/header.php';
           <input type="text" name="q" class="form-control" placeholder="Title, ref no..." value="<?= htmlspecialchars($search) ?>">
           <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
           <?php if ($filterCategory || $filterFrom || $filterTo || $filterMode || $search): ?>
-            <a href="?" class="btn btn-outline-secondary" title="Reset"><i class="bi bi-x-circle"></i></a>
+            <a href="?clear=1" class="btn btn-outline-secondary" title="Reset"><i class="bi bi-x-circle"></i></a>
           <?php endif; ?>
         </div>
       </div>
@@ -351,6 +353,7 @@ include __DIR__ . '/../../includes/header.php';
                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                     <input type="hidden" name="action" value="delete_expense">
                     <input type="hidden" name="expense_id" value="<?= $ex['id'] ?>">
+                    <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                   </form>
                 </td>
@@ -371,6 +374,7 @@ include __DIR__ . '/../../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="action" value="save_expense">
         <input type="hidden" name="expense_id" id="exp_id" value="0">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
         <div class="modal-header">
           <h5 class="modal-title" id="expModalTitle"><i class="bi bi-plus-circle me-2 text-primary"></i>Record Company Expense</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

@@ -6,6 +6,8 @@ requireAccess('payments');
 
 $db = getDB();
 
+restorePageFilters('payments', ['from_date', 'to_date', 'payment_mode', 'q']);
+
 $fromDate    = trim($_GET['from_date'] ?? '');
 $toDate      = trim($_GET['to_date'] ?? '');
 $paymentMode = trim($_GET['payment_mode'] ?? '');
@@ -350,7 +352,7 @@ include __DIR__ . '/../../includes/header.php';
       <div class="col-md-1 d-flex gap-1">
         <button type="submit" class="btn btn-sm btn-primary w-100" title="Apply Filter"><i class="bi bi-filter"></i></button>
         <?php if ($fromDate || $toDate || $paymentMode || $search): ?>
-        <a href="?tab=<?= $activeTab ?>" class="btn btn-sm btn-outline-secondary" title="Clear Filters"><i class="bi bi-x-circle"></i></a>
+        <a href="?tab=<?= $activeTab ?>&clear=1" class="btn btn-sm btn-outline-secondary" title="Clear Filters"><i class="bi bi-x-circle"></i></a>
         <?php endif; ?>
       </div>
     </form>

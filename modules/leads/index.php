@@ -12,6 +12,9 @@ $isCsm      = isRole('csm');
 $investorProjectId    = $isInvestor ? getInvestorProjectId() : 0;
 $telecallProjectIds   = $isTelecall ? getTelecallProjectIds() : [];
 
+// Persist & restore filters across requests/edits
+restorePageFilters('leads', ['project_id', 'status', 'region_id', 'source', 'q']);
+
 // Filters
 if ($isInvestor) {
     $filterProject = $investorProjectId;
@@ -221,7 +224,8 @@ include __DIR__ . '/../../includes/header.php';
     'trial_ended'    => 'danger',
     'not_interested' => 'danger',
     'follow_up'      => 'secondary',
-    'converted'      => 'success'
+    'converted'      => 'success',
+    'false_lead'     => 'dark'
   ];
   foreach ($statusColors as $st => $cls): ?>
   <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?><?= $filterSource?"&source=$filterSource":'' ?>" class="badge bg-<?= $cls ?> text-decoration-none p-2 fs-6">
@@ -234,7 +238,7 @@ include __DIR__ . '/../../includes/header.php';
   </a>
   <?php endif; ?>
   <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
-  <a href="<?= BASE_URL ?>/modules/leads/index.php" class="badge bg-light text-dark text-decoration-none p-2 fs-6 border">
+  <a href="?clear=1" class="badge bg-light text-dark text-decoration-none p-2 fs-6 border">
     <i class="bi bi-x-circle me-1"></i>Clear Filters
   </a>
   <?php endif; ?>
@@ -300,15 +304,18 @@ include __DIR__ . '/../../includes/header.php';
 
 <!-- Bulk Actions Bar -->
 <?php if ($isAdmin): ?>
-<div id="bulkActionsBar" class="d-none alert alert-danger border-0 d-flex justify-content-between align-items-center mb-3 py-3 px-4 shadow-sm" style="border-radius: 12px; background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);">
-  <div class="d-flex align-items-center gap-2 text-danger">
-    <i class="bi bi-trash3-fill fs-5"></i>
+<div id="bulkActionsBar" class="d-none alert alert-light border border-secondary border-opacity-25 d-flex justify-content-between align-items-center mb-3 py-3 px-4 shadow-sm" style="border-radius: 12px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+  <div class="d-flex align-items-center gap-2 text-dark">
+    <i class="bi bi-check2-square fs-5 text-primary"></i>
     <div>
       <span class="fw-bold" id="selectedCount">0</span> leads selected for bulk action
-      <div class="text-muted small">Only leads with "Not Interested" status can be deleted.</div>
+      <div class="text-muted small">Mark selected leads as False Lead, or Delete (for Not Interested & False Leads).</div>
     </div>
   </div>
-  <div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-dark btn-sm px-3 py-2 fw-semibold" onclick="openBulkMarkFalseModal()">
+      <i class="bi bi-x-octagon me-1"></i> Mark as False Lead
+    </button>
     <button type="button" class="btn btn-danger btn-sm px-3 py-2 fw-semibold" onclick="confirmBulkDelete()">
       <i class="bi bi-trash me-1"></i> Delete Selected
     </button>
@@ -317,6 +324,7 @@ include __DIR__ . '/../../includes/header.php';
 
 <form id="bulkDeleteForm" method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-none">
   <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
   <input type="hidden" name="bulk" value="1">
   <div id="bulkDeleteInputs"></div>
 </form>
@@ -343,10 +351,10 @@ include __DIR__ . '/../../includes/header.php';
           <tr class="<?= $isUnviewedAdLead ? 'table-danger bg-opacity-10 border-start border-4 border-danger' : '' ?>">
             <?php if ($isAdmin): ?>
             <td class="text-center">
-              <?php if ($l['status'] === 'not_interested'): ?>
-              <input type="checkbox" value="<?= $l['id'] ?>" class="form-check-input lead-select-checkbox">
+              <?php if ($l['status'] !== 'converted'): ?>
+              <input type="checkbox" value="<?= $l['id'] ?>" class="form-check-input lead-select-checkbox" data-status="<?= $l['status'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>">
               <?php else: ?>
-              <input type="checkbox" class="form-check-input" disabled title="Only 'Not Interested' leads can be deleted.">
+              <input type="checkbox" class="form-check-input" disabled title="Converted leads cannot be modified or deleted.">
               <?php endif; ?>
             </td>
             <?php endif; ?>
@@ -392,8 +400,11 @@ include __DIR__ . '/../../includes/header.php';
                 <?php if ($l['status'] !== 'converted' && hasAccess('clients')): ?>
                 <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $l['id'] ?>" class="btn btn-outline-success" title="Convert to Client"><i class="bi bi-person-check"></i></a>
                 <?php endif; ?>
+                <?php if ($l['status'] !== 'converted' && $l['status'] !== 'false_lead'): ?>
+                <button type="button" class="btn btn-outline-secondary btn-mark-false" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Mark as False Lead"><i class="bi bi-x-octagon"></i></button>
                 <?php endif; ?>
-                <?php if ($isAdmin && $l['status'] === 'not_interested'): ?>
+                <?php endif; ?>
+                <?php if ($isAdmin && in_array($l['status'], ['not_interested', 'false_lead'])): ?>
                 <button type="button" class="btn btn-outline-danger btn-delete-lead" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Delete"><i class="bi bi-trash"></i></button>
                 <?php endif; ?>
               </div>
@@ -412,6 +423,7 @@ include __DIR__ . '/../../includes/header.php';
     <div class="modal-content">
       <form method="POST" action="<?= BASE_URL ?>/modules/leads/save.php">
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
         <input type="hidden" name="id" id="leadId" value="0">
         <div class="modal-header">
           <h5 class="modal-title" id="leadModalTitle">Add Lead</h5>
@@ -479,6 +491,7 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="trial_ended">Trial Ended</option>
                 <option value="not_interested">Not Interested</option>
                 <option value="follow_up">Follow Up</option>
+                <option value="false_lead">False Lead</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -686,6 +699,48 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 </div>
 <?php endif; ?>
+<!-- Mark Lead as False Lead Modal -->
+<div class="modal fade" id="markFalseModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="markFalseForm" method="POST" action="<?= BASE_URL ?>/modules/leads/mark_false.php">
+        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+        <input type="hidden" name="id" id="markFalseLeadId" value="0">
+        <input type="hidden" name="bulk" id="markFalseBulk" value="0">
+        <div id="markFalseBulkInputs"></div>
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-x-octagon text-danger me-2"></i>Mark as False Lead</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="markFalsePrompt">Are you sure you want to mark this lead as a <strong>False Lead</strong>?</p>
+          <div class="mb-3">
+            <label class="form-label">Reason <span class="text-muted">(Optional)</span></label>
+            <select name="reason" id="markFalseReason" class="form-select">
+              <option value="">-- Select Reason --</option>
+              <option value="Invalid Phone / Contact Number">Invalid Phone / Contact Number</option>
+              <option value="Fake / Spam Inquiry">Fake / Spam Inquiry</option>
+              <option value="Wrong Location / Out of Service Area">Wrong Location / Out of Service Area</option>
+              <option value="Irrelevant / Student / Job Seeker">Irrelevant / Student / Job Seeker</option>
+              <option value="Duplicate Lead">Duplicate Lead</option>
+              <option value="Not Reachable / Disconnected">Not Reachable / Disconnected</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Additional Notes <span class="text-muted">(Optional)</span></label>
+            <textarea name="notes" id="markFalseNotes" class="form-control" rows="2" placeholder="Any details explaining why this lead is false..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-x-octagon me-1"></i>Confirm Mark as False</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script>
 const allPlans = <?= json_encode($db->query("SELECT id,project_id,name,price FROM plans WHERE status='active' ORDER BY name")->fetchAll()) ?>;
@@ -744,24 +799,66 @@ function updateBulkActionsBar() {
   }
 }
 
+function openBulkMarkFalseModal() {
+  const checkboxes = document.querySelectorAll('.lead-select-checkbox:checked');
+  if (checkboxes.length === 0) {
+    alert('Please select at least one lead.');
+    return;
+  }
+  const eligible = Array.from(checkboxes).filter(cb => cb.getAttribute('data-status') !== 'false_lead');
+  if (eligible.length === 0) {
+    alert('All selected leads are already marked as False Lead.');
+    return;
+  }
+
+  document.getElementById('markFalseLeadId').value = '0';
+  document.getElementById('markFalseBulk').value = '1';
+  document.getElementById('markFalsePrompt').innerHTML = `Are you sure you want to mark <strong>${eligible.length}</strong> selected lead(s) as <strong>False Lead</strong>?`;
+  document.getElementById('markFalseReason').value = '';
+  document.getElementById('markFalseNotes').value = '';
+
+  const container = document.getElementById('markFalseBulkInputs');
+  container.innerHTML = '';
+  eligible.forEach(cb => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'lead_ids[]';
+    input.value = cb.value;
+    container.appendChild(input);
+  });
+
+  new bootstrap.Modal(document.getElementById('markFalseModal')).show();
+}
+
 function confirmBulkDelete() {
   const checkboxes = document.querySelectorAll('.lead-select-checkbox:checked');
   if (checkboxes.length === 0) {
     alert('Please select at least one lead to delete.');
     return;
   }
-  if (confirm(`Are you sure you want to delete the ${checkboxes.length} selected lead(s)? This action cannot be undone.`)) {
-    const container = document.getElementById('bulkDeleteInputs');
-    container.innerHTML = ''; // clear first
-    checkboxes.forEach(cb => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'lead_ids[]';
-      input.value = cb.value;
-      container.appendChild(input);
-    });
-    document.getElementById('bulkDeleteForm').submit();
+  const invalidDeletes = Array.from(checkboxes).filter(cb => {
+    const st = cb.getAttribute('data-status');
+    return st !== 'not_interested' && st !== 'false_lead';
+  });
+  if (invalidDeletes.length > 0) {
+    if (!confirm(`${invalidDeletes.length} of the ${checkboxes.length} selected lead(s) are neither "Not Interested" nor "False Lead" and cannot be deleted. Proceed with deleting only the eligible leads?`)) {
+      return;
+    }
+  } else {
+    if (!confirm(`Are you sure you want to delete the ${checkboxes.length} selected lead(s)? This action cannot be undone.`)) {
+      return;
+    }
   }
+  const container = document.getElementById('bulkDeleteInputs');
+  container.innerHTML = ''; // clear first
+  checkboxes.forEach(cb => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'lead_ids[]';
+    input.value = cb.value;
+    container.appendChild(input);
+  });
+  document.getElementById('bulkDeleteForm').submit();
 }
 
 <?php endif; ?>
@@ -907,6 +1004,21 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Single mark false lead modal trigger
+  $(document).on('click', '.btn-mark-false', function() {
+    const id = $(this).data('id');
+    const name = $(this).data('name');
+
+    document.getElementById('markFalseLeadId').value = id;
+    document.getElementById('markFalseBulk').value = '0';
+    document.getElementById('markFalseBulkInputs').innerHTML = '';
+    document.getElementById('markFalsePrompt').innerHTML = `Are you sure you want to mark <strong>${name}</strong> as a <strong>False Lead</strong>?`;
+    document.getElementById('markFalseReason').value = '';
+    document.getElementById('markFalseNotes').value = '';
+
+    new bootstrap.Modal(document.getElementById('markFalseModal')).show();
+  });
+
   // Single delete via event delegation
   $(document).on('click', '.btn-delete-lead', function() {
     const id = $(this).data('id');
@@ -923,6 +1035,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <?php if ($isAdmin): ?>
 <form id="singleDeleteForm" method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-none">
   <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+  <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
   <input type="hidden" name="id" id="singleDeleteId" value="0">
 </form>
 <?php endif; ?>

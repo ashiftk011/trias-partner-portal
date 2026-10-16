@@ -64,7 +64,7 @@ $currentUser = currentUser();
 </nav>
 
 <!-- Sidebar + Content Wrapper -->
-<div class="wrapper d-flex">
+<div class="wrapper">
   <?php include __DIR__ . '/sidebar.php'; ?>
-  <div class="main-content flex-grow-1">
+  <div class="main-content">
     <div class="content-area p-4">

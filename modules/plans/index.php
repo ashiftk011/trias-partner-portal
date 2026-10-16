@@ -35,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect(BASE_URL . '/modules/plans/index.php');
 }
 
+restorePageFilters('plans', ['project_id', 'region_id']);
+
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 $filterRegion  = isset($_GET['region_id'])  ? (int)$_GET['region_id']  : 0;
 
@@ -90,7 +92,7 @@ include __DIR__ . '/../../includes/header.php';
         </select>
       </div>
       <?php if ($filterProject || $filterRegion): ?>
-      <div class="col-auto"><a href="<?= BASE_URL ?>/modules/plans/index.php" class="btn btn-sm btn-outline-secondary">Clear Filters</a></div>
+      <div class="col-auto"><a href="?clear=1" class="btn btn-sm btn-outline-secondary">Clear Filters</a></div>
       <?php endif; ?>
     </form>
   </div>
@@ -178,6 +180,7 @@ include __DIR__ . '/../../includes/header.php';
           <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
           <input type="hidden" name="action" value="delete">
           <input type="hidden" name="id" value="<?= $pl['id'] ?>">
+          <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
           <button class="btn btn-sm btn-outline-danger w-100">
             <i class="bi bi-trash me-1"></i> Delete
           </button>
@@ -197,6 +200,7 @@ include __DIR__ . '/../../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="action" value="save">
         <input type="hidden" name="id" id="planId" value="0">
+        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
         <div class="modal-header">
           <h5 class="modal-title" id="planModalTitle">Add Plan</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

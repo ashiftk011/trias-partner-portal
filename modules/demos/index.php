@@ -7,6 +7,8 @@ $db = getDB();
 $user = currentUser();
 $isCsm = isRole('csm');
 
+restorePageFilters('demos', ['status', 'project_id', 'q']);
+
 $filterStatus  = $_GET['status'] ?? '';
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 $filterSearch  = trim($_GET['q'] ?? '');
@@ -84,11 +86,11 @@ include __DIR__ . '/../../includes/header.php';
     <?= ucfirst($st) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
-  <a href="?" class="badge <?= !$filterStatus ? 'bg-primary' : 'bg-light text-dark' ?> text-decoration-none p-2 fs-6">
+  <a href="?clear=1" class="badge <?= !$filterStatus ? 'bg-primary' : 'bg-light text-dark' ?> text-decoration-none p-2 fs-6">
     All <span class="ms-1"><?= array_sum($counts) ?></span>
   </a>
   <?php if ($filterStatus || $filterProject || $filterSearch): ?>
-  <a href="?" class="badge bg-light text-dark text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
+  <a href="?clear=1" class="badge bg-light text-dark text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
   <?php endif; ?>
 </div>
 

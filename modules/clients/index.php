@@ -9,6 +9,9 @@ $isInvestor = isRole('investor');
 $isCsm = isRole('csm');
 $investorProjectId = $isInvestor ? getInvestorProjectId() : 0;
 
+// Persist & restore filters across requests/edits
+restorePageFilters('clients', ['project_id', 'status', 'q']);
+
 $filterProject = $isInvestor ? $investorProjectId : (isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0);
 $filterStatus  = $_GET['status'] ?? '';
 $filterSearch  = trim($_GET['q'] ?? '');
@@ -67,7 +70,7 @@ include __DIR__ . '/../../includes/header.php';
 
 <!-- Status Pills -->
 <div class="d-flex flex-wrap gap-2 mb-3">
-  <a href="?" class="badge bg-<?= !$filterStatus?'primary':'secondary' ?> text-decoration-none p-2 fs-6">All <span><?= array_sum($counts) ?></span></a>
+  <a href="?clear=1" class="badge bg-<?= !$filterStatus?'primary':'secondary' ?> text-decoration-none p-2 fs-6">All <span><?= array_sum($counts) ?></span></a>
   <a href="?status=active" class="badge bg-<?= $filterStatus==='active'?'success':'secondary' ?> text-decoration-none p-2 fs-6">Active <span><?= $counts['active']??0 ?></span></a>
   <a href="?status=inactive" class="badge bg-<?= $filterStatus==='inactive'?'secondary':'light text-dark' ?> text-decoration-none p-2 fs-6">Inactive <span><?= $counts['inactive']??0 ?></span></a>
   <a href="?status=suspended" class="badge bg-<?= $filterStatus==='suspended'?'danger':'secondary' ?> text-decoration-none p-2 fs-6">Suspended <span><?= $counts['suspended']??0 ?></span></a>
@@ -96,7 +99,7 @@ include __DIR__ . '/../../includes/header.php';
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>Search</button>
         <?php if ($filterSearch || (!$isInvestor && $filterProject) || $filterStatus): ?>
-        <a href="?" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+        <a href="?clear=1" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
         <?php endif; ?>
       </div>
     </form>

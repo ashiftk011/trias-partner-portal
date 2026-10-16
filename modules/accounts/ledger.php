@@ -9,6 +9,8 @@ requireAccess('accounts');
 $db = getDB();
 $accounts = getCompanyAccounts();
 
+restorePageFilters('accounts_ledger', ['account_id', 'from_date', 'to_date', 'q']);
+
 $accountId  = (int)($_GET['account_id'] ?? ($accounts[0]['id'] ?? 0));
 $fromDate   = trim($_GET['from_date'] ?? date('Y-m-01')); // first day of current month
 $toDate     = trim($_GET['to_date'] ?? date('Y-m-d'));
@@ -69,7 +71,7 @@ include __DIR__ . '/../../includes/header.php';
 
       <div class="col-md-1 d-flex gap-1">
         <button type="submit" class="btn btn-primary btn-sm w-100" title="Filter"><i class="bi bi-search"></i></button>
-        <a href="<?= BASE_URL ?>/modules/accounts/ledger.php?account_id=<?= $accountId ?>" class="btn btn-light btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></a>
+        <a href="?clear=1" class="btn btn-light btn-sm" title="Reset"><i class="bi bi-arrow-counterclockwise"></i></a>
       </div>
     </form>
   </div>

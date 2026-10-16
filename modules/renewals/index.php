@@ -4,8 +4,11 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireAccess('renewals');
 
 $db = getDB();
+restorePageFilters('renewals', ['client_id', 'status', 'expiring']);
+
 $filterClient = isset($_GET['client_id']) ? (int)$_GET['client_id'] : 0;
 $filterStatus = $_GET['status'] ?? '';
+$filterExpiring = !empty($_GET['expiring']);
 
 $sql = "SELECT rn.*,pl.name as plan_name,pl.price as plan_price,pl.duration_months,c.name as client_name,c.client_code,c.company,p.name as project_name,u.name as renewed_by_name
         FROM renewals rn
@@ -17,6 +20,7 @@ $sql = "SELECT rn.*,pl.name as plan_name,pl.price as plan_price,pl.duration_mont
 $params = [];
 if ($filterClient) { $sql .= " AND rn.client_id=?"; $params[] = $filterClient; }
 if ($filterStatus) { $sql .= " AND rn.status=?";    $params[] = $filterStatus; }
+if ($filterExpiring) { $sql .= " AND rn.end_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)"; }
 $sql .= " ORDER BY rn.end_date ASC";
 $stmt = $db->prepare($sql); $stmt->execute($params);
 $renewals = $stmt->fetchAll();
@@ -88,7 +92,7 @@ include __DIR__ . '/../../includes/header.php';
       </div>
       <div class="col-auto">
         <button class="btn btn-sm btn-primary">Filter</button>
-        <?php if ($filterClient || $filterStatus): ?><a href="?" class="btn btn-sm btn-outline-secondary ms-1">Clear</a><?php endif; ?>
+        <?php if ($filterClient || $filterStatus || $filterExpiring): ?><a href="?clear=1" class="btn btn-sm btn-outline-secondary ms-1">Clear</a><?php endif; ?>
       </div>
     </form>
   </div>

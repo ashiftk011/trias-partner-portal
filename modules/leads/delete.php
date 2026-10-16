@@ -28,13 +28,13 @@ if ($bulk) {
     $leadIds = array_map('intval', $leadIds);
     $placeholders = implode(',', array_fill(0, count($leadIds), '?'));
 
-    // Select leads matching these IDs and whose status is 'not_interested'
-    $stmt = $db->prepare("SELECT id FROM leads WHERE id IN ($placeholders) AND status = 'not_interested'");
+    // Select leads matching these IDs and whose status is 'not_interested' or 'false_lead'
+    $stmt = $db->prepare("SELECT id FROM leads WHERE id IN ($placeholders) AND status IN ('not_interested', 'false_lead')");
     $stmt->execute($leadIds);
     $validIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
     if (empty($validIds)) {
-        setFlash('error', 'No valid "Not Interested" leads found for deletion.');
+        setFlash('error', 'No valid "Not Interested" or "False Lead" leads found for deletion.');
         redirect(BASE_URL . '/modules/leads/index.php');
     }
 
@@ -53,7 +53,7 @@ if ($bulk) {
             setFlash('success', "Successfully deleted $deletedCount lead(s).");
         } else {
             $skippedCount = $totalRequested - $deletedCount;
-            setFlash('warning', "Deleted $deletedCount lead(s). $skippedCount lead(s) were skipped because their status is not 'Not Interested'.");
+            setFlash('warning', "Deleted $deletedCount lead(s). $skippedCount lead(s) were skipped because their status is not 'Not Interested' or 'False Lead'.");
         }
     } catch (Exception $e) {
         $db->rollBack();
@@ -75,8 +75,8 @@ if ($bulk) {
         redirect(BASE_URL . '/modules/leads/index.php');
     }
 
-    if ($lead['status'] !== 'not_interested') {
-        setFlash('error', 'Only leads with "Not Interested" status can be deleted.');
+    if (!in_array($lead['status'], ['not_interested', 'false_lead'])) {
+        setFlash('error', 'Only leads with "Not Interested" or "False Lead" status can be deleted.');
         redirect(BASE_URL . '/modules/leads/index.php');
     }
 

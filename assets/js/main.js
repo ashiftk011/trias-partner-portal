@@ -38,6 +38,18 @@ $(document).ready(function () {
     }
   });
 
+  // If ?clear= is present in URL, clear DataTables saved state for a fresh view
+  if (window.location.search.indexOf('clear') !== -1 && window.sessionStorage) {
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.indexOf('DataTables') !== -1) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch(e) {}
+  }
+
   // ---- DataTables Init ----
   if ($.fn.DataTable) {
     $('table.datatable').each(function () {
@@ -50,6 +62,8 @@ $(document).ready(function () {
         }
 
         $(this).DataTable({
+          stateSave: true,
+          stateDuration: -1, // Use sessionStorage so state is preserved across reloads but resets when the tab is closed
           pageLength: 25,
           language: {
             search: '',

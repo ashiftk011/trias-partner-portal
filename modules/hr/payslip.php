@@ -7,7 +7,7 @@ $db = getDB();
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) die("Invalid Salary Slip ID");
 
-$sql = "SELECT sp.*, e.name as employee_name, e.emp_number, e.email, e.phone, e.designation, e.department, e.joining_date, e.bank_name, e.bank_account_no, e.ifsc_code, e.pan_no
+$sql = "SELECT sp.*, e.name as employee_name, e.emp_number, e.email, e.phone, e.designation, e.department, e.employment_type, e.gst_no, e.joining_date, e.bank_name, e.bank_account_no, e.ifsc_code, e.pan_no
         FROM salary_payments sp
         JOIN employees e ON e.id = sp.employee_id
         WHERE sp.id = ?";
@@ -16,6 +16,13 @@ $stmt->execute([$id]);
 $slip = $stmt->fetch();
 
 if (!$slip) die("Salary Slip record not found.");
+
+$isContractor = in_array($slip['employment_type'] ?? '', ['contract', 'freelance']);
+$docTitle = match($slip['employment_type'] ?? '') {
+    'freelance' => 'CONSULTANT PAYMENT VOUCHER',
+    'contract'  => 'CONTRACT DISBURSEMENT ADVICE',
+    default     => 'SALARY SLIP'
+};
 
 $monthNames = [1=>'January',2=>'February',3=>'March',4=>'April',5=>'May',6=>'June',7=>'July',8=>'August',9=>'September',10=>'October',11=>'November',12=>'December'];
 
@@ -106,7 +113,7 @@ $cLogo    = $companySettings['company_logo'] ?? '';
     <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4 flex-wrap gap-3">
       <!-- LEFT SIDE: Salary Slip Title & Period -->
       <div class="text-start">
-        <h4 class="fw-extrabold text-primary mb-1" style="font-weight:800; letter-spacing:-0.02em;">SALARY SLIP</h4>
+        <h4 class="fw-extrabold text-primary mb-1" style="font-weight:800; letter-spacing:-0.02em;"><?= htmlspecialchars($docTitle) ?></h4>
         <div class="badge bg-primary text-uppercase font-monospace px-3 py-2 fs-6 mb-1"><?= $monthNames[$slip['month']] ?> <?= $slip['year'] ?></div>
         <div class="small text-muted font-monospace mt-1">Slip No: <strong><?= htmlspecialchars($slip['slip_number']) ?></strong></div>
       </div>
@@ -135,15 +142,15 @@ $cLogo    = $companySettings['company_logo'] ?? '';
       <div class="row g-3">
         <div class="col-md-6 border-end">
           <div class="d-flex justify-content-between py-1 small">
-            <span class="text-muted">Employee Name:</span>
+            <span class="text-muted"><?= $isContractor ? 'Personnel Name:' : 'Employee Name:' ?></span>
             <span class="fw-bold"><?= htmlspecialchars($slip['employee_name']) ?></span>
           </div>
           <div class="d-flex justify-content-between py-1 small">
-            <span class="text-muted">Employee Code:</span>
+            <span class="text-muted">Staff / Emp Code:</span>
             <span class="fw-bold font-monospace"><?= htmlspecialchars($slip['emp_number']) ?></span>
           </div>
           <div class="d-flex justify-content-between py-1 small">
-            <span class="text-muted">Designation:</span>
+            <span class="text-muted">Role / Designation:</span>
             <span class="fw-semibold"><?= htmlspecialchars($slip['designation']) ?></span>
           </div>
           <div class="d-flex justify-content-between py-1 small">
@@ -151,8 +158,8 @@ $cLogo    = $companySettings['company_logo'] ?? '';
             <span class="fw-semibold"><?= htmlspecialchars($slip['department'] ?: 'General') ?></span>
           </div>
           <div class="d-flex justify-content-between py-1 small">
-            <span class="text-muted">Joining Date:</span>
-            <span><?= date('d M Y', strtotime($slip['joining_date'])) ?></span>
+            <span class="text-muted">Engagement Type:</span>
+            <span class="fw-semibold"><?= ucfirst(str_replace('_',' ', $slip['employment_type'] ?? 'full_time')) ?></span>
           </div>
         </div>
 
@@ -177,6 +184,12 @@ $cLogo    = $companySettings['company_logo'] ?? '';
             <span class="text-muted">PAN Number:</span>
             <span class="font-monospace"><?= htmlspecialchars($slip['pan_no'] ?: 'N/A') ?></span>
           </div>
+          <?php if (!empty($slip['gst_no'])): ?>
+            <div class="d-flex justify-content-between py-1 small">
+              <span class="text-muted">GSTIN:</span>
+              <span class="font-monospace text-uppercase fw-semibold"><?= htmlspecialchars($slip['gst_no']) ?></span>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     </div>
@@ -184,7 +197,7 @@ $cLogo    = $companySettings['company_logo'] ?? '';
     <!-- Salary Breakdown Table -->
     <div class="row g-4 mb-4">
       <div class="col-6">
-        <h6 class="fw-bold text-success border-bottom pb-2 mb-2"><i class="bi bi-plus-circle me-1"></i>Earnings & Allowances</h6>
+        <h6 class="fw-bold text-success border-bottom pb-2 mb-2"><i class="bi bi-plus-circle me-1"></i><?= $isContractor ? 'Disbursements & Retainers' : 'Earnings & Allowances' ?></h6>
         <table class="table table-sm table-payslip align-middle mb-0">
           <thead>
             <tr>
@@ -193,14 +206,14 @@ $cLogo    = $companySettings['company_logo'] ?? '';
             </tr>
           </thead>
           <tbody>
-            <tr><td>Basic Salary</td><td class="text-end">₹<?= number_format($slip['basic_salary'], 2) ?></td></tr>
+            <tr><td><?= $isContractor ? 'Professional Retainer / Fixed Fee' : 'Basic Salary' ?></td><td class="text-end">₹<?= number_format($slip['basic_salary'], 2) ?></td></tr>
             <tr><td>HRA</td><td class="text-end">₹<?= number_format($slip['hra'], 2) ?></td></tr>
             <tr><td>Conveyance Allowance</td><td class="text-end">₹<?= number_format($slip['conveyance'], 2) ?></td></tr>
-            <tr><td>Special Allowance</td><td class="text-end">₹<?= number_format($slip['special_allowance'], 2) ?></td></tr>
+            <tr><td>Special Allowance / Bonus</td><td class="text-end">₹<?= number_format($slip['special_allowance'], 2) ?></td></tr>
           </tbody>
           <tfoot class="table-light fw-bold">
             <tr>
-              <td>Gross Monthly Earnings</td>
+              <td><?= $isContractor ? 'Gross Professional Fee' : 'Gross Monthly Earnings' ?></td>
               <td class="text-end text-success">₹<?= number_format($slip['gross_salary'], 2) ?></td>
             </tr>
           </tfoot>

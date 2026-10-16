@@ -6,6 +6,9 @@ requireAccess('invoices');
 
 $db = getDB();
 
+// Persist & restore filters across requests/edits
+restorePageFilters('invoices', ['client_id', 'status', 'q']);
+
 $filterClient = isset($_GET['client_id']) ? (int)$_GET['client_id'] : 0;
 $filterStatus = $_GET['status'] ?? '';
 $filterSearch = trim($_GET['q'] ?? '');
@@ -111,7 +114,7 @@ include __DIR__ . '/../../includes/header.php';
   </a>
   <?php endforeach; ?>
   <?php if ($filterStatus || $filterClient || $filterSearch): ?>
-  <a href="?" class="badge bg-secondary text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
+  <a href="?clear=1" class="badge bg-secondary text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
   <?php endif; ?>
 </div>
 
@@ -178,6 +181,7 @@ include __DIR__ . '/../../includes/header.php';
                 <form method="POST" action="<?= BASE_URL ?>/modules/invoices/delete.php" class="d-inline" onsubmit="return confirm('Delete invoice <?= htmlspecialchars($inv['invoice_no'], ENT_QUOTES) ?>? This will also remove all payments. This cannot be undone.')">
                   <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                   <input type="hidden" name="id" value="<?= $inv['id'] ?>">
+                  <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
                   <button type="submit" class="btn btn-outline-danger" title="Delete Invoice"><i class="bi bi-trash"></i></button>
                 </form>
                 <?php endif; ?>

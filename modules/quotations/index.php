@@ -8,6 +8,8 @@ $db = getDB();
 $user = currentUser();
 $isCsm = isRole('csm');
 
+restorePageFilters('quotations', ['status', 'project_id', 'q']);
+
 $filterStatus  = $_GET['status'] ?? '';
 $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 $filterSearch  = trim($_GET['q'] ?? '');
@@ -67,11 +69,11 @@ include __DIR__ . '/../../includes/header.php';
     <?= ucfirst($st) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
-  <a href="?" class="badge <?= !$filterStatus ? 'bg-primary' : 'bg-light text-dark' ?> text-decoration-none p-2 fs-6">
+  <a href="?clear=1" class="badge <?= !$filterStatus ? 'bg-primary' : 'bg-light text-dark' ?> text-decoration-none p-2 fs-6">
     All <span class="ms-1"><?= array_sum($counts) ?></span>
   </a>
   <?php if ($filterStatus || $filterProject || $filterSearch): ?>
-  <a href="?" class="badge bg-light text-dark text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
+  <a href="?clear=1" class="badge bg-light text-dark text-decoration-none p-2 fs-6"><i class="bi bi-x-circle me-1"></i>Clear</a>
   <?php endif; ?>
 </div>
 
@@ -139,6 +141,7 @@ include __DIR__ . '/../../includes/header.php';
                 <form method="POST" action="<?= BASE_URL ?>/modules/quotations/delete.php" class="d-inline" onsubmit="return confirm('Delete this quotation?')">
                   <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                   <input type="hidden" name="id" value="<?= $q['id'] ?>">
+                  <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
                   <button type="submit" class="btn btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
                 </form>
                 <?php endif; ?>

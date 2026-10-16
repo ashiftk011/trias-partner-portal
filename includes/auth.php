@@ -209,10 +209,112 @@ function generateCode(string $prefix, string $table, string $column): string {
     return $code;
 }
 
-// Safe redirect
+// Validate that a URL is a safe local relative or base URL (prevents open redirects)
+function safeLocalUrl(string $url): ?string {
+    $url = trim($url);
+    if ($url === '') return null;
+    // Reject scheme-relative (//example.com) or external schemes (http://, https://, javascript:)
+    if (str_starts_with($url, '//') || preg_match('#^[a-z][a-z0-9+.-]*://#i', $url)) {
+        if (defined('BASE_URL') && BASE_URL !== '' && str_starts_with($url, BASE_URL)) {
+            return $url;
+        }
+        return null;
+    }
+    if (str_starts_with($url, '/')) {
+        return $url;
+    }
+    return null;
+}
+
+// Safe redirect with automatic return_url preservation
 function redirect(string $url): void {
+    $returnUrl = $_POST['return_url'] ?? $_GET['return_url'] ?? '';
+    if (!empty($returnUrl)) {
+        $safe = safeLocalUrl((string)$returnUrl);
+        if ($safe !== null) {
+            header('Location: ' . $safe);
+            exit;
+        }
+    }
     header('Location: ' . $url);
     exit;
+}
+
+/**
+ * Return current page request URI for use in forms as return_url
+ */
+function getReturnUrl(string $fallback = ''): string {
+    return $_SERVER['REQUEST_URI'] ?? $fallback;
+}
+
+/**
+ * Persist and restore page filters in session across edits, reloads, and navigation.
+ *
+ * @param string $moduleKey    Unique identifier for the module (e.g. 'leads', 'invoices', 'clients')
+ * @param array  $filterKeys   List of GET parameter keys that act as filters (e.g. ['status', 'project_id', 'q'])
+ */
+function restorePageFilters(string $moduleKey, array $filterKeys = []): void {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+        return;
+    }
+
+    if (session_status() === PHP_SESSION_NONE) {
+        @session_start();
+    }
+
+    // 1. Explicit clear requested (e.g. ?clear=1 or ?clear_filters=1 or ?reset=1)
+    if (isset($_GET['clear']) || isset($_GET['clear_filters']) || isset($_GET['reset'])) {
+        unset($_SESSION['page_filters'][$moduleKey]);
+        unset($_GET['clear'], $_GET['clear_filters'], $_GET['reset']);
+
+        $uriParts = explode('?', $_SERVER['REQUEST_URI'] ?? '');
+        $cleanUri = $uriParts[0];
+
+        // Preserve non-filter query parameters if any (e.g. tab=xyz)
+        $remaining = [];
+        foreach ($_GET as $gk => $gv) {
+            if (!in_array($gk, $filterKeys)) {
+                $remaining[$gk] = $gv;
+            }
+        }
+        $target = $cleanUri . (!empty($remaining) ? ('?' . http_build_query($remaining)) : '');
+        header('Location: ' . $target);
+        exit;
+    }
+
+    // 2. Check if any filter keys are currently present in $_GET
+    $hasGetFilter = false;
+    foreach ($filterKeys as $k) {
+        if (isset($_GET[$k])) {
+            $hasGetFilter = true;
+            break;
+        }
+    }
+
+    if ($hasGetFilter) {
+        // User applied or submitted filters in $_GET -> Save to session
+        $filtered = [];
+        foreach ($filterKeys as $k) {
+            if (isset($_GET[$k]) && $_GET[$k] !== '') {
+                $filtered[$k] = $_GET[$k];
+            }
+        }
+        if (!empty($filtered)) {
+            $_SESSION['page_filters'][$moduleKey] = $filtered;
+        } else {
+            // User submitted an empty filter form (e.g. cleared inputs and clicked Search/Filter)
+            unset($_SESSION['page_filters'][$moduleKey]);
+        }
+    } elseif (!empty($_SESSION['page_filters'][$moduleKey])) {
+        // No filters in $_GET, but session has active filters -> Restore them by redirecting to URL with filters
+        $saved = $_SESSION['page_filters'][$moduleKey];
+        $uriParts = explode('?', $_SERVER['REQUEST_URI'] ?? '');
+        $base = $uriParts[0];
+        $merged = array_merge($saved, $_GET);
+        $target = $base . '?' . http_build_query($merged);
+        header('Location: ' . $target);
+        exit;
+    }
 }
 
 // Role display label
@@ -240,6 +342,7 @@ function statusBadge(string $status): string {
         'converted'     => 'success',
         'trial'         => 'info',
         'trial_ended'   => 'secondary',
+        'false_lead'    => 'dark',
         'pending'       => 'warning',
         'paid'          => 'success',
         'partial'       => 'info',
@@ -252,3 +355,13 @@ function statusBadge(string $status): string {
     $label = ucwords(str_replace('_', ' ', $status));
     return "<span class='badge badge-soft-{$cls}'><span class='badge-dot bg-{$cls}'></span>{$label}</span>";
 }
+
+function employmentTypeBadge(string $type): string {
+    return match($type) {
+        'contract'  => '<span class="badge badge-soft-warning"><i class="bi bi-file-earmark-text me-1"></i>Contract</span>',
+        'freelance' => '<span class="badge badge-soft-info"><i class="bi bi-laptop me-1"></i>Freelance</span>',
+        'intern'    => '<span class="badge badge-soft-secondary"><i class="bi bi-mortarboard me-1"></i>Intern</span>',
+        default     => '<span class="badge badge-soft-primary"><i class="bi bi-person-workspace me-1"></i>Full-Time</span>',
+    };
+}
+
