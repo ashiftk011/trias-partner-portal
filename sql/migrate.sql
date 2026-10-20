@@ -700,3 +700,76 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS gst_no VARCHAR(25) NULL AFTER pan
 -- Migration: Add false_lead status to leads and lead_responses
 ALTER TABLE leads MODIFY COLUMN status ENUM('new','contacted','interested','not_interested','follow_up','converted','trial','trial_ended','false_lead') DEFAULT 'new';
 ALTER TABLE lead_responses MODIFY COLUMN status_updated ENUM('new','contacted','interested','not_interested','follow_up','converted','trial','trial_ended','false_lead') NULL;
+
+-- Migration: Expense Client/Project Allocation & Split, and Company Assets Tracking
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS allocation_type ENUM('general', 'client', 'project', 'both') NOT NULL DEFAULT 'general' AFTER amount;
+
+CREATE TABLE IF NOT EXISTS expense_clients (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    expense_id INT NOT NULL,
+    client_id INT NOT NULL,
+    split_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_expense_client (expense_id, client_id),
+    FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS expense_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    expense_id INT NOT NULL,
+    project_id INT NOT NULL,
+    split_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_expense_project (expense_id, project_id),
+    FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS asset_categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO asset_categories (name, description) VALUES
+('IT & Computer Hardware', 'Laptops, Desktops, Monitors, Servers, Storage drives'),
+('Software & Tool Licenses', 'Perpetual licenses, Software subscriptions, Enterprise tools'),
+('Office Furniture & Fixtures', 'Desks, Ergonomic chairs, Meeting tables, Filing cabinets'),
+('Networking & Telecom', 'Routers, Switches, Firewalls, Server racks, IP phones'),
+('Office Appliances & Electronics', 'Printers, Scanners, Projectors, Air Conditioners, TVs'),
+('Vehicles & Transport', 'Company owned bikes, cars, delivery vehicles'),
+('Miscellaneous Fixed Assets', 'Other physical or intangible company property')
+ON DUPLICATE KEY UPDATE description=VALUES(description);
+
+CREATE TABLE IF NOT EXISTS company_assets (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    asset_code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    category_id INT NULL,
+    purchase_date DATE NOT NULL,
+    purchase_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    current_value DECIMAL(12,2) NULL,
+    vendor_name VARCHAR(150) NULL,
+    invoice_no VARCHAR(100) NULL,
+    serial_no VARCHAR(150) NULL,
+    warranty_expiry DATE NULL,
+    account_id INT NULL,
+    assigned_to_user_id INT NULL,
+    assigned_to_employee_id INT NULL,
+    location VARCHAR(150) NULL,
+    status ENUM('active','in_use','maintenance','damaged','disposed','sold') NOT NULL DEFAULT 'active',
+    condition_status ENUM('excellent','good','fair','poor') NOT NULL DEFAULT 'good',
+    attachment_file VARCHAR(255) NULL,
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES asset_categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (account_id) REFERENCES company_accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to_employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

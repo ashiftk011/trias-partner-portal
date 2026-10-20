@@ -445,11 +445,24 @@ include __DIR__ . '/../../includes/header.php';
               </table>
 
               <h6 class="fw-bold text-muted border-bottom pb-2">2. Receivables &amp; Current Assets</h6>
-              <table class="table table-sm table-borderless mb-0">
+              <table class="table table-sm table-borderless mb-3">
                 <tbody>
                   <tr>
                     <td>Accounts Receivable (Pending Invoices)</td>
                     <td class="text-end fw-bold">₹<?= number_format($bs['accounts_receivable'], 2) ?></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h6 class="fw-bold text-muted border-bottom pb-2">3. Fixed Assets (Company Property &amp; Equipment)</h6>
+              <table class="table table-sm table-borderless mb-0">
+                <tbody>
+                  <tr>
+                    <td>
+                      <i class="bi bi-laptop me-1 text-primary"></i>Company Assets (Hardware, IT, Tools, Furniture)
+                      <a href="<?= BASE_URL ?>/modules/expenses/assets.php" class="ms-1 small text-decoration-none no-print"><i class="bi bi-box-arrow-up-right"></i></a>
+                    </td>
+                    <td class="text-end fw-bold">₹<?= number_format($bs['fixed_assets'] ?? 0, 2) ?></td>
                   </tr>
                 </tbody>
                 <tfoot class="border-top">

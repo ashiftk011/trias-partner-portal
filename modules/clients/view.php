@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/expense_helpers.php';
 requireAccess('clients');
 
 $db = getDB();
@@ -11,6 +12,9 @@ $stmt = $db->prepare("SELECT c.*,p.name as project_name,pl.name as plan_name,pl.
 $stmt->execute([$id]);
 $client = $stmt->fetch();
 if (!$client) redirect(BASE_URL . '/modules/clients/index.php');
+
+$clientFinancial = getClientFinancialSummary($id);
+
 
 $user = currentUser();
 if (isRole('csm') && (int)($client['created_by'] ?? 0) !== (int)$user['id']) {
@@ -303,6 +307,110 @@ include __DIR__ . '/../../includes/header.php';
       </div>
     </div>
     <?php endif; ?>
+
+    <!-- Client Profitability & Direct Allocated Expenses -->
+    <div class="card border-0 shadow-sm mt-4" id="profitability">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Client Profitability &amp; Direct Costs</span>
+        <?php if (hasAccess('expenses')): ?>
+        <a href="<?= BASE_URL ?>/modules/expenses/index.php?client_id=<?= $id ?>" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus me-1"></i>Allocate Expense
+        </a>
+        <?php endif; ?>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-sm-3 col-6">
+            <div class="border rounded p-2 text-center bg-light">
+              <span class="text-muted small d-block">Invoiced Revenue</span>
+              <span class="fw-bold fs-6 text-primary">₹<?= number_format($clientFinancial['total_invoiced'] ?? 0, 2) ?></span>
+            </div>
+          </div>
+          <div class="col-sm-3 col-6">
+            <div class="border rounded p-2 text-center bg-light">
+              <span class="text-muted small d-block">Cash Collected</span>
+              <span class="fw-bold fs-6 text-success">₹<?= number_format($clientFinancial['total_collected'] ?? 0, 2) ?></span>
+            </div>
+          </div>
+          <div class="col-sm-3 col-6">
+            <div class="border rounded p-2 text-center bg-light">
+              <span class="text-muted small d-block">Direct Costs (Servers)</span>
+              <span class="fw-bold fs-6 text-danger">₹<?= number_format($clientFinancial['total_expenses'] ?? 0, 2) ?></span>
+            </div>
+          </div>
+          <div class="col-sm-3 col-6">
+            <?php 
+              $isProf = ($clientFinancial['profit_invoiced'] ?? 0) >= 0; 
+              $bgClass = $isProf ? 'bg-success bg-opacity-10 border-success' : 'bg-danger bg-opacity-10 border-danger';
+              $textClass = $isProf ? 'text-success' : 'text-danger';
+            ?>
+            <div class="border rounded p-2 text-center <?= $bgClass ?>">
+              <span class="text-muted small d-block">Net Profit / Loss (<?= $clientFinancial['margin_pct'] ?? 0 ?>%)</span>
+              <span class="fw-bold fs-6 <?= $textClass ?>">
+                <?= $isProf ? '+' : '' ?>₹<?= number_format($clientFinancial['profit_invoiced'] ?? 0, 2) ?>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <h6 class="fw-bold small text-muted mb-2"><i class="bi bi-hdd-network me-1"></i>Allocated Expenses (Servers, Tools &amp; Specific Costs)</h6>
+        <?php if (!empty($clientFinancial['allocated_expenses_list'])): ?>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Expense Item / Purpose</th>
+                <th>Category</th>
+                <th class="text-end">Total Bill</th>
+                <th class="text-center">Split Count</th>
+                <th class="text-end">Client's Share</th>
+                <th>Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($clientFinancial['allocated_expenses_list'] as $aExp): ?>
+              <tr>
+                <td class="small text-muted text-nowrap"><?= date('d M Y', strtotime($aExp['expense_date'])) ?></td>
+                <td>
+                  <div class="fw-semibold small text-dark"><?= htmlspecialchars($aExp['title']) ?></div>
+                  <?php if (!empty($aExp['vendor_name'])): ?>
+                    <small class="text-muted"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($aExp['vendor_name']) ?></small>
+                  <?php endif; ?>
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark border" style="font-size:0.75rem;">
+                    <?= htmlspecialchars($aExp['category_name']) ?>
+                  </span>
+                </td>
+                <td class="text-end small text-muted">₹<?= number_format($aExp['total_expense_amount'], 2) ?></td>
+                <td class="text-center">
+                  <span class="badge bg-info-subtle text-info border">
+                    <?= (int)$aExp['client_split_count'] ?> Clients
+                  </span>
+                </td>
+                <td class="text-end fw-bold text-danger">₹<?= number_format($aExp['client_split_amount'], 2) ?></td>
+                <td>
+                  <?php if (!empty($aExp['receipt_file'])): ?>
+                    <a href="<?= BASE_URL . '/' . htmlspecialchars($aExp['receipt_file']) ?>" target="_blank" class="btn btn-sm btn-outline-info py-0 px-1" title="View Receipt">
+                      <i class="bi bi-paperclip"></i>
+                    </a>
+                  <?php else: ?>
+                    <span class="text-muted small">-</span>
+                  <?php endif; ?>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php else: ?>
+        <div class="text-muted small text-center py-3 bg-light rounded">
+          <i class="bi bi-check-circle text-success me-1"></i>No specific expenses allocated to this client yet.
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
 
     <!-- Feed Query & Suggestion Form -->
     <div class="card border-0 shadow-sm mt-4 mb-4">

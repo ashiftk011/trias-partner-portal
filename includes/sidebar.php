@@ -25,8 +25,11 @@ $navSections = [
             ['module'=>'renewals',  'icon'=>'arrow-repeat',     'label'=>'Renewals',    'url'=>BASE_URL.'/modules/renewals/index.php'],
             ['module'=>'invoices',  'icon'=>'receipt',          'label'=>'Invoices',    'url'=>BASE_URL.'/modules/invoices/index.php'],
             ['module'=>'payments',  'icon'=>'cash-stack',       'label'=>'Payments Report','url'=>BASE_URL.'/modules/payments/index.php'],
-            ['module'=>'expenses',  'icon'=>'credit-card-2-front','label'=>'Company Expenses','url'=>BASE_URL.'/modules/expenses/index.php'],
+            ['module'=>'expenses', 'submodule'=>'expenses', 'icon'=>'credit-card-2-front','label'=>'Company Expenses','url'=>BASE_URL.'/modules/expenses/index.php'],
+            ['module'=>'expenses', 'submodule'=>'pnl',      'icon'=>'graph-up-arrow',    'label'=>'Client & Project P&L','url'=>BASE_URL.'/modules/expenses/reports.php'],
+            ['module'=>'expenses', 'submodule'=>'assets',   'icon'=>'laptop',            'label'=>'Company Assets','url'=>BASE_URL.'/modules/expenses/assets.php'],
             ['module'=>'projects',  'icon'=>'folder2-open',     'label'=>'Projects',    'url'=>BASE_URL.'/modules/projects/index.php'],
+
             ['module'=>'plans',     'icon'=>'clipboard-check',  'label'=>'Plans',       'url'=>BASE_URL.'/modules/plans/index.php'],
             ['module'=>'regions',   'icon'=>'geo-alt-fill',     'label'=>'Regions',     'url'=>BASE_URL.'/modules/regions/index.php'],
         ]
@@ -129,6 +132,12 @@ try {
                           $isActive = in_array($currentPageScript, ['ledger.php']);
                       } elseif ($item['submodule'] === 'reports') {
                           $isActive = in_array($currentPageScript, ['reports.php']);
+                      } elseif ($item['submodule'] === 'expenses') {
+                          $isActive = in_array($currentPageScript, ['index.php']);
+                      } elseif ($item['submodule'] === 'pnl') {
+                          $isActive = in_array($currentPageScript, ['reports.php']);
+                      } elseif ($item['submodule'] === 'assets') {
+                          $isActive = in_array($currentPageScript, ['assets.php']);
                       } else {
                           $isActive = true;
                       }

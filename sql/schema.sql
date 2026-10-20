@@ -500,15 +500,82 @@ CREATE TABLE expenses (
     title VARCHAR(255) NOT NULL,
     vendor_name VARCHAR(150) NULL,
     amount DECIMAL(10,2) NOT NULL,
+    allocation_type ENUM('general', 'client', 'project', 'both') NOT NULL DEFAULT 'general',
     expense_date DATE NOT NULL,
     payment_mode ENUM('bank_transfer','cash','upi','cheque','card','other') DEFAULT 'bank_transfer',
+    account_id INT NULL,
     reference_no VARCHAR(100) NULL,
     description TEXT NULL,
     receipt_file VARCHAR(255) NULL,
     created_by INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT,
+    FOREIGN KEY (account_id) REFERENCES company_accounts(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Expense Client Allocations (Equal or specific split)
+CREATE TABLE expense_clients (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    expense_id INT NOT NULL,
+    client_id INT NOT NULL,
+    split_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_expense_client (expense_id, client_id),
+    FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+
+-- Expense Project Allocations (Equal or specific split)
+CREATE TABLE expense_projects (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    expense_id INT NOT NULL,
+    project_id INT NOT NULL,
+    split_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_expense_project (expense_id, project_id),
+    FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+-- Asset Categories
+CREATE TABLE asset_categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Company Assets (Recorded separately from operational expenses)
+CREATE TABLE company_assets (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    asset_code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    category_id INT NULL,
+    purchase_date DATE NOT NULL,
+    purchase_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    current_value DECIMAL(12,2) NULL,
+    vendor_name VARCHAR(150) NULL,
+    invoice_no VARCHAR(100) NULL,
+    serial_no VARCHAR(150) NULL,
+    warranty_expiry DATE NULL,
+    account_id INT NULL,
+    assigned_to_user_id INT NULL,
+    assigned_to_employee_id INT NULL,
+    location VARCHAR(150) NULL,
+    status ENUM('active','in_use','maintenance','damaged','disposed','sold') NOT NULL DEFAULT 'active',
+    condition_status ENUM('excellent','good','fair','poor') NOT NULL DEFAULT 'good',
+    attachment_file VARCHAR(255) NULL,
+    notes TEXT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES asset_categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (account_id) REFERENCES company_accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to_employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
 
 

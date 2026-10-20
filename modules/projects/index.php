@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/expense_helpers.php';
 requireAccess('projects');
 
 $db = getDB();
@@ -37,16 +38,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $projects = $db->query("SELECT p.*, (SELECT COUNT(*) FROM leads l WHERE l.project_id=p.id) as lead_count, (SELECT COUNT(*) FROM plans pl WHERE pl.project_id=p.id) as plan_count FROM projects p ORDER BY p.name")->fetchAll();
 
+$allProjectFin = getAllProjectsFinancials();
+$projectFinMap = [];
+foreach ($allProjectFin as $pf) {
+    $projectFinMap[$pf['id']] = $pf;
+}
+
 $pageTitle = 'Projects';
 include __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="page-header d-flex justify-content-between align-items-center mb-4">
-  <div><h4 class="mb-0">Projects</h4><p class="text-muted small mb-0">Manage all service projects</p></div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#projectModal">
-    <i class="bi bi-folder-plus me-1"></i> Add Project
-  </button>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div><h4 class="mb-0">Projects</h4><p class="text-muted small mb-0">Manage service projects and track client revenue vs project expenditures</p></div>
+  <div class="d-flex gap-2">
+    <?php if (hasAccess('expenses')): ?>
+    <a href="<?= BASE_URL ?>/modules/expenses/reports.php?view=project" class="btn btn-outline-info">
+      <i class="bi bi-graph-up-arrow me-1"></i>Project P&amp;L Report
+    </a>
+    <?php endif; ?>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#projectModal">
+      <i class="bi bi-folder-plus me-1"></i> Add Project
+    </button>
+  </div>
 </div>
+
 
 <?php displayFlash(); ?>
 
@@ -76,16 +91,33 @@ include __DIR__ . '/../../includes/header.php';
     <div class="table-responsive">
       <table class="table table-hover mb-0 datatable">
         <thead class="table-light">
-          <tr><th>#</th><th>Project Name</th><th>Description</th><th>Plans</th><th>Leads</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Project Name</th><th>Description</th><th>Plans</th><th>Leads</th><th>Financials (P&amp;L)</th><th>Status</th><th>Created</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          <?php foreach ($projects as $i => $p): ?>
+          <?php foreach ($projects as $i => $p): 
+            $pf = $projectFinMap[$p['id']] ?? null;
+          ?>
           <tr>
             <td><?= $i+1 ?></td>
             <td class="fw-semibold"><?= htmlspecialchars($p['name']) ?></td>
             <td class="text-muted small"><?= htmlspecialchars(substr($p['description']??'',0,60)) ?><?= strlen($p['description']??'')>60?'...':'' ?></td>
             <td><a href="<?= BASE_URL ?>/modules/plans/index.php?project_id=<?= $p['id'] ?>" class="badge bg-info text-decoration-none"><?= $p['plan_count'] ?> Plans</a></td>
             <td><a href="<?= BASE_URL ?>/modules/leads/index.php?project_id=<?= $p['id'] ?>" class="badge bg-primary text-decoration-none"><?= $p['lead_count'] ?> Leads</a></td>
+            <td>
+              <?php if ($pf): ?>
+                <div class="small">
+                  <span class="text-primary fw-semibold">Rev: ₹<?= number_format($pf['total_revenue'], 0) ?></span> | 
+                  <span class="text-danger fw-semibold">Cost: ₹<?= number_format($pf['total_expenses'], 0) ?></span>
+                </div>
+                <div>
+                  <span class="badge <?= $pf['net_profit'] >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' ?> border" style="font-size:0.75rem;">
+                    <?= $pf['net_profit'] >= 0 ? '+' : '' ?>₹<?= number_format($pf['net_profit'], 2) ?> (<?= $pf['margin_pct'] ?>%)
+                  </span>
+                </div>
+              <?php else: ?>
+                <span class="text-muted small">-</span>
+              <?php endif; ?>
+            </td>
             <td><?= statusBadge($p['status']) ?></td>
             <td class="text-muted small"><?= date('d M Y', strtotime($p['created_at'])) ?></td>
             <td>
@@ -100,6 +132,7 @@ include __DIR__ . '/../../includes/header.php';
           </tr>
           <?php endforeach; ?>
         </tbody>
+
       </table>
     </div>
   </div>

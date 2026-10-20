@@ -546,9 +546,18 @@ function getBalanceSheet(string $asOfDate = ''): array {
     $arStmt->execute([$asOfDate]);
     $accountsReceivable = (float)$arStmt->fetchColumn();
 
-    $totalAssets = $totalCashBank + $accountsReceivable;
+    // 3. Fixed / Company Assets (recorded separately from operational expenses)
+    $faStmt = $db->prepare("
+        SELECT COALESCE(SUM(COALESCE(current_value, purchase_cost)), 0)
+        FROM company_assets
+        WHERE status NOT IN ('disposed', 'sold') AND purchase_date <= ?
+    ");
+    $faStmt->execute([$asOfDate]);
+    $fixedAssets = (float)$faStmt->fetchColumn();
 
-    // 3. Liabilities & Retained Earnings / Equity
+    $totalAssets = $totalCashBank + $accountsReceivable + $fixedAssets;
+
+    // 4. Liabilities & Retained Earnings / Equity
     $pnl = getProfitAndLoss('', $asOfDate);
     $retainedEarnings = $pnl['net_profit'];
 
@@ -559,20 +568,22 @@ function getBalanceSheet(string $asOfDate = ''): array {
     ");
     $openingEquity = (float)$opEquityStmt->fetchColumn();
 
-    $totalEquity = $openingEquity + $retainedEarnings;
-    $totalLiabilitiesEquity = $totalEquity; // Simplified balanced ledger
+    $totalEquity = $openingEquity + $retainedEarnings + $fixedAssets;
+    $totalLiabilitiesEquity = $totalEquity; // Balanced ledger
 
     return [
         'as_of_date'            => $asOfDate,
         'cash_bank_accounts'    => $accountBalances,
         'total_cash_bank'       => $totalCashBank,
         'accounts_receivable'   => $accountsReceivable,
+        'fixed_assets'          => $fixedAssets,
         'total_assets'          => $totalAssets,
         'opening_equity'        => $openingEquity,
         'retained_earnings'     => $retainedEarnings,
         'total_equity'          => $totalEquity,
         'total_liabilities_equity' => $totalLiabilitiesEquity
     ];
+
 }
 
 /**
