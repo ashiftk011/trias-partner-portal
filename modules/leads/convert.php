@@ -116,19 +116,19 @@ include __DIR__ . '/../../includes/header.php';
         <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-person-badge me-2 text-primary"></i>Client Information</div>
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label">Full Name *</label>
               <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($lead['name']) ?>" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label">Phone *</label>
-              <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($lead['phone']) ?>" required>
+              <input type="tel" name="phone" class="form-control" inputmode="tel" value="<?= htmlspecialchars($lead['phone']) ?>" required>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label">Email</label>
-              <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($lead['email'] ?? '') ?>">
+              <input type="email" name="email" class="form-control" inputmode="email" value="<?= htmlspecialchars($lead['email'] ?? '') ?>">
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
               <label class="form-label">Company</label>
               <input type="text" name="company" class="form-control" value="<?= htmlspecialchars($lead['company'] ?? '') ?>">
             </div>

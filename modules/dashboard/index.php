@@ -201,11 +201,23 @@ if (hasAccess('quotations')) {
 include __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="page-header d-flex align-items-center mb-4">
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
   <div>
     <h4 class="mb-0">Dashboard</h4>
     <p class="text-muted small mb-0">Welcome back, <?= htmlspecialchars($user['name']) ?>!</p>
   </div>
+  <?php if ($isTelecall): ?>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="<?= BASE_URL ?>/modules/leads/index.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-funnel me-1"></i>View Leads (<?= number_format($stats['total_leads']) ?>)
+    </a>
+    <?php if (($stats['new_leads'] ?? 0) > 0): ?>
+    <a href="<?= BASE_URL ?>/modules/leads/index.php?status=new" class="btn btn-warning btn-sm fw-bold">
+      <i class="bi bi-telephone-outbound me-1"></i>Call New Leads (<?= $stats['new_leads'] ?>)
+    </a>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php displayFlash(); ?>
@@ -213,7 +225,70 @@ include __DIR__ . '/../../includes/header.php';
 <!-- Stat Cards -->
 <div class="row g-3 mb-4">
 
-<?php if (hasAccess('leads')): ?>
+<?php if ($isTelecall): ?>
+  <!-- Telecaller Specific 4-Card Responsive Grid -->
+  <div class="col-6 col-xl-3">
+    <div class="stat-card card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="stat-icon bg-primary-subtle rounded-3 p-3">
+          <i class="bi bi-funnel-fill fs-3 text-primary"></i>
+        </div>
+        <div>
+          <div class="stat-value fw-bold fs-3"><?= number_format($stats['total_leads']) ?></div>
+          <div class="stat-label text-muted small">Total Leads</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="<?= BASE_URL ?>/modules/leads/index.php?status=new" class="text-decoration-none">
+      <div class="stat-card card border-0 shadow-sm h-100 border-start border-4 border-warning">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="stat-icon bg-warning-subtle rounded-3 p-3">
+            <i class="bi bi-star-fill fs-3 text-warning"></i>
+          </div>
+          <div>
+            <div class="stat-value fw-bold fs-3 text-warning"><?= number_format($stats['new_leads']) ?></div>
+            <div class="stat-label text-muted small">New Uncontacted</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="<?= BASE_URL ?>/modules/leads/index.php?status=follow_up" class="text-decoration-none">
+      <div class="stat-card card border-0 shadow-sm h-100 border-start border-4 border-info">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="stat-icon bg-info-subtle rounded-3 p-3">
+            <i class="bi bi-clock-history fs-3 text-info"></i>
+          </div>
+          <div>
+            <div class="stat-value fw-bold fs-3 text-info"><?= number_format($stats['follow_up_leads']) ?></div>
+            <div class="stat-label text-muted small">Follow-up Needed</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-xl-3">
+    <a href="<?= BASE_URL ?>/modules/leads/index.php?status=converted" class="text-decoration-none">
+      <div class="stat-card card border-0 shadow-sm h-100 border-start border-4 border-success">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="stat-icon bg-success-subtle rounded-3 p-3">
+            <i class="bi bi-check-circle-fill fs-3 text-success"></i>
+          </div>
+          <div>
+            <div class="stat-value fw-bold fs-3 text-success"><?= number_format($stats['converted_leads']) ?></div>
+            <div class="stat-label text-muted small">Converted Clients</div>
+            <?php if ($stats['total_leads'] > 0): ?>
+            <div class="mt-1"><span class="badge bg-success"><?= round($stats['converted_leads']/$stats['total_leads']*100) ?>% Rate</span></div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+<?php elseif (hasAccess('leads')): ?>
   <div class="col-sm-6 col-xl-3">
     <div class="stat-card card border-0 shadow-sm h-100">
       <div class="card-body d-flex align-items-center gap-3">
@@ -399,20 +474,23 @@ include __DIR__ . '/../../includes/header.php';
 <div class="row g-4">
   <!-- Recent Leads -->
   <?php if (hasAccess('leads') && $recentLeads): ?>
-  <div class="col-xl-7">
+  <div class="<?= $isTelecall ? 'col-12' : 'col-xl-7' ?>">
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
         <h6 class="mb-0 fw-semibold"><i class="bi bi-funnel me-2 text-primary"></i>Recent Leads</h6>
         <a href="<?= BASE_URL ?>/modules/leads/index.php" class="btn btn-sm btn-outline-primary">View All</a>
       </div>
       <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
+        <!-- Desktop Table View -->
+        <div class="table-responsive d-none d-md-block">
+          <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
-              <tr><th>Lead</th><th>Project</th><th>Phone</th><th>Status</th><th>Date</th></tr>
+              <tr><th>Lead</th><th>Project</th><th>Phone</th><th>Status</th><th>Date</th><th class="text-end">Quick Actions</th></tr>
             </thead>
             <tbody>
-              <?php foreach ($recentLeads as $lead): ?>
+              <?php foreach ($recentLeads as $lead): 
+                $cleanPhone = preg_replace('/\D/', '', $lead['phone'] ?? '');
+              ?>
               <tr>
                 <td>
                   <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $lead['id'] ?>" class="fw-semibold text-decoration-none">
@@ -422,15 +500,76 @@ include __DIR__ . '/../../includes/header.php';
                   <div class="text-muted small"><?= htmlspecialchars($lead['company']) ?></div>
                   <?php endif; ?>
                 </td>
-                <td><span class="badge bg-light text-dark"><?= htmlspecialchars($lead['project_name'] ?? '') ?></span></td>
-                <td><?= htmlspecialchars($lead['phone']) ?></td>
+                <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($lead['project_name'] ?? '') ?></span></td>
+                <td>
+                  <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="text-decoration-none text-dark fw-medium small">
+                    <i class="bi bi-telephone me-1 text-success"></i><?= htmlspecialchars($lead['phone']) ?>
+                  </a>
+                </td>
                 <td><?= statusBadge($lead['status']) ?></td>
                 <td class="text-muted small"><?= date('d M', strtotime($lead['created_at'])) ?></td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="btn btn-outline-success" title="Direct Call">
+                      <i class="bi bi-telephone-fill"></i>
+                    </a>
+                    <?php if ($cleanPhone): ?>
+                    <a href="https://wa.me/<?= $cleanPhone ?>" target="_blank" class="btn btn-outline-success" title="WhatsApp Message">
+                      <i class="bi bi-whatsapp"></i>
+                    </a>
+                    <?php endif; ?>
+                    <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $lead['id'] ?>" class="btn btn-outline-primary" title="View Lead">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </div>
+                </td>
               </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
         </div>
+
+        <!-- Mobile Card View -->
+        <div class="d-md-none p-3">
+          <?php foreach ($recentLeads as $lead): 
+            $cleanPhone = preg_replace('/\D/', '', $lead['phone'] ?? '');
+          ?>
+          <div class="lead-mobile-card">
+            <div class="lead-card-header">
+              <span class="badge bg-light text-dark border"><?= htmlspecialchars($lead['project_name'] ?? '') ?></span>
+              <div><?= statusBadge($lead['status']) ?></div>
+            </div>
+            <div>
+              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $lead['id'] ?>" class="lead-card-title">
+                <?= htmlspecialchars($lead['name']) ?>
+              </a>
+              <?php if (!empty($lead['company'])): ?>
+                <div class="text-muted small"><i class="bi bi-building me-1"></i><?= htmlspecialchars($lead['company']) ?></div>
+              <?php endif; ?>
+            </div>
+            <div class="lead-card-phone-row mt-2">
+              <div class="fw-semibold text-dark">
+                <i class="bi bi-phone me-1 text-muted"></i><?= htmlspecialchars($lead['phone']) ?>
+              </div>
+              <small class="text-muted"><?= date('d M', strtotime($lead['created_at'])) ?></small>
+            </div>
+            <div class="lead-card-actions">
+              <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="btn btn-call btn-sm flex-grow-1">
+                <i class="bi bi-telephone-fill me-1"></i>Call
+              </a>
+              <?php if ($cleanPhone): ?>
+              <a href="https://wa.me/<?= $cleanPhone ?>" target="_blank" class="btn btn-whatsapp btn-sm px-3">
+                <i class="bi bi-whatsapp"></i>
+              </a>
+              <?php endif; ?>
+              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $lead['id'] ?>" class="btn btn-outline-primary btn-sm px-3">
+                <i class="bi bi-eye"></i>
+              </a>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+
       </div>
     </div>
   </div>

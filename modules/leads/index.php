@@ -110,26 +110,39 @@ $pageTitle = 'Leads';
 include __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="page-header d-flex justify-content-between align-items-center mb-3">
-  <div><h4 class="mb-0">Leads Management</h4><p class="text-muted small mb-0">Track and manage all client leads with automated Instagram sync</p></div>
-  <?php if (!$isInvestor): ?>
-  <div class="d-flex gap-2">
-    <?php if ($isAdmin): ?>
-    <button type="button" class="btn btn-outline-danger" id="btnSyncMetaLeadsDirect">
-      <i class="bi bi-arrow-repeat me-1"></i>Sync Meta Leads
-    </button>
-    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#instagramModal">
-      <i class="bi bi-instagram me-1"></i>Meta Webhook & Setup
-    </button>
-    <?php endif; ?>
-    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#csvModal">
-      <i class="bi bi-file-earmark-arrow-up me-1"></i>Import CSV
-    </button>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal">
-      <i class="bi bi-plus-circle me-1"></i> Add Lead
-    </button>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h4 class="mb-0">Leads Management</h4>
+    <p class="text-muted small mb-0">Track and manage all client leads with automated Instagram sync</p>
   </div>
-  <?php endif; ?>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <!-- View Switcher (Cards vs Table) -->
+    <div class="btn-group btn-group-sm border rounded-3 p-1 bg-white shadow-sm" id="leadsViewToggleGroup">
+      <button type="button" class="btn btn-sm btn-white border-0 fw-semibold active" id="btnViewCards" onclick="setLeadsView('cards')">
+        <i class="bi bi-grid-fill me-1"></i>Cards
+      </button>
+      <button type="button" class="btn btn-sm btn-light border-0 fw-semibold text-muted" id="btnViewTable" onclick="setLeadsView('table')">
+        <i class="bi bi-table me-1"></i>Table
+      </button>
+    </div>
+
+    <?php if (!$isInvestor): ?>
+      <?php if ($isAdmin): ?>
+      <button type="button" class="btn btn-sm btn-outline-danger d-none d-sm-inline-flex" id="btnSyncMetaLeadsDirect">
+        <i class="bi bi-arrow-repeat me-1"></i>Sync Meta
+      </button>
+      <button class="btn btn-sm btn-outline-danger d-none d-md-inline-flex" data-bs-toggle="modal" data-bs-target="#instagramModal">
+        <i class="bi bi-instagram me-1"></i>Meta Webhook
+      </button>
+      <?php endif; ?>
+      <button class="btn btn-sm btn-outline-secondary d-none d-sm-inline-flex" data-bs-toggle="modal" data-bs-target="#csvModal">
+        <i class="bi bi-file-earmark-arrow-up me-1"></i>Import
+      </button>
+      <button class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#leadModal">
+        <i class="bi bi-plus-circle me-1"></i>Add Lead
+      </button>
+    <?php endif; ?>
+  </div>
 </div>
 
 <?php displayFlash(); ?>
@@ -213,8 +226,8 @@ include __DIR__ . '/../../includes/header.php';
 </div>
 <?php endif; ?>
 
-<!-- Status Summary Pills -->
-<div class="d-flex flex-wrap gap-2 mb-3">
+<!-- Status Summary Pills (Horizontally Scrollable on Mobile) -->
+<div class="status-pill-scroll mb-3">
   <?php
   $statusColors = [
     'new'            => 'primary',
@@ -227,76 +240,119 @@ include __DIR__ . '/../../includes/header.php';
     'converted'      => 'success',
     'false_lead'     => 'dark'
   ];
-  foreach ($statusColors as $st => $cls): ?>
-  <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?><?= $filterSource?"&source=$filterSource":'' ?>" class="badge bg-<?= $cls ?> text-decoration-none p-2 fs-6">
-    <?= ucwords(str_replace('_',' ',$st)) ?> <span class="ms-1"><?= $counts[$st] ?? 0 ?></span>
+  ?>
+  <a href="?clear=1" class="status-pill-link bg-light text-dark border <?= (!$filterStatus && !$filterSource) ? 'active-filter' : '' ?>">
+    <i class="bi bi-layers-fill me-1 text-primary"></i>All Leads <span class="badge bg-secondary ms-1"><?= count($leads) ?></span>
+  </a>
+  <?php foreach ($statusColors as $st => $cls): 
+    $isActive = ($filterStatus === $st);
+  ?>
+  <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?><?= $filterSource?"&source=$filterSource":'' ?>" 
+     class="status-pill-link bg-<?= $cls ?> text-white <?= $isActive ? 'active-filter' : '' ?>">
+    <?= ucwords(str_replace('_',' ',$st)) ?> <span class="badge bg-dark bg-opacity-25 ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
   <?php if ($filterSource): ?>
-  <a href="?source=<?= urlencode($filterSource) ?>" class="badge text-white text-decoration-none p-2 fs-6 shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
+  <a href="?source=<?= urlencode($filterSource) ?>" class="status-pill-link text-white shadow-sm active-filter" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
     <i class="bi bi-instagram me-1"></i>Source: <?= htmlspecialchars($filterSource) ?>
   </a>
   <?php endif; ?>
   <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
-  <a href="?clear=1" class="badge bg-light text-dark text-decoration-none p-2 fs-6 border">
+  <a href="?clear=1" class="status-pill-link bg-danger text-white border-0">
     <i class="bi bi-x-circle me-1"></i>Clear Filters
   </a>
   <?php endif; ?>
 </div>
 
 <!-- Filter Bar -->
+<?php
+$activeFilterCount = 0;
+if ($filterProject) $activeFilterCount++;
+if ($filterRegion) $activeFilterCount++;
+if ($filterSource) $activeFilterCount++;
+if ($filterStatus) $activeFilterCount++;
+?>
 <div class="card border-0 shadow-sm mb-3">
-  <div class="card-body py-2">
-    <form method="GET" class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <input type="text" name="q" class="form-control form-control-sm" placeholder="Search name, phone, company..." value="<?= htmlspecialchars($filterSearch) ?>">
+  <div class="card-body p-2 p-md-3">
+    <form method="GET" id="leadsFilterForm">
+      <div class="row g-2 align-items-center">
+        <div class="col-12 col-md-5">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" name="q" class="form-control border-start-0" placeholder="Search name, phone, company..." value="<?= htmlspecialchars($filterSearch) ?>">
+            <?php if ($filterSearch): ?>
+              <a href="?clear=1" class="btn btn-outline-secondary" title="Clear search"><i class="bi bi-x"></i></a>
+            <?php endif; ?>
+          </div>
+        </div>
+        
+        <div class="col-12 col-md-7 d-flex flex-wrap gap-2 align-items-center justify-content-between justify-content-md-end">
+          <button type="button" class="btn btn-sm btn-outline-secondary d-md-none" data-bs-toggle="collapse" data-bs-target="#moreFiltersCollapse" aria-expanded="<?= $activeFilterCount > 0 ? 'true' : 'false' ?>">
+            <i class="bi bi-funnel me-1"></i>Filters <?php if ($activeFilterCount > 0): ?><span class="badge bg-primary ms-1"><?= $activeFilterCount ?></span><?php endif; ?>
+          </button>
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-search me-1"></i>Search & Filter
+          </button>
+          <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
+          <a href="?clear=1" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-x me-1"></i>Clear
+          </a>
+          <?php endif; ?>
+        </div>
       </div>
-      <div class="col-md-2">
-        <?php if ($isInvestor): ?>
-          <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
-          <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[array_search($investorProjectId, array_column($projects, 'id'))]['name'] ?? 'My Project') ?>" disabled>
-        <?php elseif ($isTelecall && count($projects) === 1): ?>
-          <input type="hidden" name="project_id" value="<?= $projects[0]['id'] ?>">
-          <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[0]['name']) ?>" disabled>
-        <?php else: ?>
-        <select name="project_id" class="form-select form-select-sm">
-          <option value="">All Projects</option>
-          <?php foreach ($projects as $pr): ?>
-          <option value="<?= $pr['id'] ?>" <?= $filterProject==$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <?php endif; ?>
-      </div>
-      <div class="col-md-2">
-        <select name="region_id" class="form-select form-select-sm">
-          <option value="">All Regions</option>
-          <?php foreach ($regions as $r): ?>
-          <option value="<?= $r['id'] ?>" <?= $filterRegion==$r['id']?'selected':'' ?>><?= htmlspecialchars($r['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <select name="source" class="form-select form-select-sm">
-          <option value="">All Sources</option>
-          <option value="social_media" <?= $filterSource==='social_media'?'selected':'' ?>>Instagram / Social</option>
-          <option value="website" <?= $filterSource==='website'?'selected':'' ?>>Website</option>
-          <option value="referral" <?= $filterSource==='referral'?'selected':'' ?>>Referral</option>
-          <option value="cold_call" <?= $filterSource==='cold_call'?'selected':'' ?>>Cold Call</option>
-          <option value="email" <?= $filterSource==='email'?'selected':'' ?>>Email</option>
-          <option value="exhibition" <?= $filterSource==='exhibition'?'selected':'' ?>>Exhibition</option>
-          <option value="other" <?= $filterSource==='other'?'selected':'' ?>>Other</option>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <select name="status" class="form-select form-select-sm">
-          <option value="">All Statuses</option>
-          <?php foreach (array_keys($statusColors) as $st): ?>
-          <option value="<?= $st ?>" <?= $filterStatus===$st?'selected':'' ?>><?= ucwords(str_replace('_',' ',$st)) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search me-1"></i>Filter</button>
+
+      <!-- Expandable Filters (Collapsed on Mobile by default, always visible on Desktop) -->
+      <div class="collapse d-md-block <?= $activeFilterCount > 0 ? 'show' : '' ?> mt-2" id="moreFiltersCollapse">
+        <div class="row g-2 pt-2 border-top">
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1 d-md-none">Project</label>
+            <?php if ($isInvestor): ?>
+              <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
+              <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[array_search($investorProjectId, array_column($projects, 'id'))]['name'] ?? 'My Project') ?>" disabled>
+            <?php elseif ($isTelecall && count($projects) === 1): ?>
+              <input type="hidden" name="project_id" value="<?= $projects[0]['id'] ?>">
+              <input type="text" class="form-control form-control-sm" value="<?= htmlspecialchars($projects[0]['name']) ?>" disabled>
+            <?php else: ?>
+            <select name="project_id" class="form-select form-select-sm">
+              <option value="">All Projects</option>
+              <?php foreach ($projects as $pr): ?>
+              <option value="<?= $pr['id'] ?>" <?= $filterProject==$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1 d-md-none">Region</label>
+            <select name="region_id" class="form-select form-select-sm">
+              <option value="">All Regions</option>
+              <?php foreach ($regions as $r): ?>
+              <option value="<?= $r['id'] ?>" <?= $filterRegion==$r['id']?'selected':'' ?>><?= htmlspecialchars($r['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1 d-md-none">Source</label>
+            <select name="source" class="form-select form-select-sm">
+              <option value="">All Sources</option>
+              <option value="social_media" <?= $filterSource==='social_media'?'selected':'' ?>>Instagram / Social</option>
+              <option value="website" <?= $filterSource==='website'?'selected':'' ?>>Website</option>
+              <option value="referral" <?= $filterSource==='referral'?'selected':'' ?>>Referral</option>
+              <option value="cold_call" <?= $filterSource==='cold_call'?'selected':'' ?>>Cold Call</option>
+              <option value="email" <?= $filterSource==='email'?'selected':'' ?>>Email</option>
+              <option value="exhibition" <?= $filterSource==='exhibition'?'selected':'' ?>>Exhibition</option>
+              <option value="other" <?= $filterSource==='other'?'selected':'' ?>>Other</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small text-muted mb-1 d-md-none">Status</label>
+            <select name="status" class="form-select form-select-sm">
+              <option value="">All Statuses</option>
+              <?php foreach (array_keys($statusColors) as $st): ?>
+              <option value="<?= $st ?>" <?= $filterStatus===$st?'selected':'' ?>><?= ucwords(str_replace('_',' ',$st)) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        </div>
       </div>
     </form>
   </div>
@@ -330,57 +386,50 @@ include __DIR__ . '/../../includes/header.php';
 </form>
 <?php endif; ?>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0 datatable align-middle">
-        <thead class="table-light">
-          <tr>
-            <?php if ($isAdmin): ?>
-            <th data-orderable="false" data-searchable="false" width="40" class="text-center">
-              <input type="checkbox" id="selectAllLeads" class="form-check-input">
-            </th>
-            <?php endif; ?>
-            <th>Code</th><th>Lead</th><th>Contact</th><th>Project</th><th>Region</th><th>Source</th><th>Status</th><th>Assigned</th><th>Date</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-          <?php foreach ($leads as $l): 
-            $isAdLead = ($l['source'] === 'social_media');
-            $isUnviewedAdLead = ($isAdLead && empty($l['is_viewed']) && $l['status'] === 'new');
-          ?>
-          <tr class="<?= $isUnviewedAdLead ? 'table-danger bg-opacity-10 border-start border-4 border-danger' : '' ?>">
-            <?php if ($isAdmin): ?>
-            <td class="text-center">
-              <?php if ($l['status'] !== 'converted'): ?>
-              <input type="checkbox" value="<?= $l['id'] ?>" class="form-check-input lead-select-checkbox" data-status="<?= $l['status'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>">
-              <?php else: ?>
-              <input type="checkbox" class="form-check-input" disabled title="Converted leads cannot be modified or deleted.">
-              <?php endif; ?>
-            </td>
-            <?php endif; ?>
-            <td>
-              <small class="text-muted font-monospace"><?= htmlspecialchars($l['lead_code'] ?? '') ?></small>
-            </td>
-            <td>
-              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="fw-semibold text-decoration-none text-dark">
+<!-- Mobile Cards View Container -->
+<div id="leadsCardsContainer">
+  <div class="row g-3 mb-4">
+    <?php if (empty($leads)): ?>
+      <div class="col-12">
+        <div class="card border-0 shadow-sm text-center py-5">
+          <i class="bi bi-inbox fs-1 text-muted mb-2"></i>
+          <h6 class="fw-bold">No leads found</h6>
+          <p class="text-muted small mb-0">Try clearing your filters or add a new lead.</p>
+        </div>
+      </div>
+    <?php else: ?>
+      <?php foreach ($leads as $l): 
+        $isAdLead = ($l['source'] === 'social_media');
+        $isUnviewedAdLead = ($isAdLead && empty($l['is_viewed']) && $l['status'] === 'new');
+        $cleanPhone = preg_replace('/\D/', '', $l['phone'] ?? '');
+      ?>
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="lead-mobile-card h-100 d-flex flex-column justify-content-between <?= $isUnviewedAdLead ? 'is-new-ad-lead' : '' ?>">
+          <div>
+            <div class="lead-card-header">
+              <span class="badge bg-light text-dark font-monospace border"><?= htmlspecialchars($l['lead_code'] ?? '') ?></span>
+              <div class="d-flex align-items-center gap-1">
+                <?php if ($isUnviewedAdLead): ?>
+                  <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); color: #fff; font-size: 0.65rem;">
+                    <i class="bi bi-star-fill me-1"></i>New Ad
+                  </span>
+                <?php endif; ?>
+                <?= statusBadge($l['status']) ?>
+              </div>
+            </div>
+            <div>
+              <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="lead-card-title">
                 <?= htmlspecialchars($l['name']) ?>
               </a>
-              <?php if ($isUnviewedAdLead): ?>
-                <span class="badge ms-1 shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); color: #fff; font-size: 0.65rem;">
-                  <i class="bi bi-star-fill me-1"></i>New Ad Lead
-                </span>
+              <?php if (!empty($l['company'])): ?>
+                <div class="text-muted small mt-1"><i class="bi bi-building me-1"></i><?= htmlspecialchars($l['company']) ?></div>
               <?php endif; ?>
-              <?php if ($l['company']): ?>
-              <div class="text-muted small"><i class="bi bi-building me-1"></i><?= htmlspecialchars($l['company']) ?></div>
+            </div>
+            <div class="lead-card-meta">
+              <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($l['project_name'] ?? '') ?></span>
+              <?php if (!empty($l['region_name'])): ?>
+                <span class="badge bg-light text-dark border"><?= htmlspecialchars($l['region_name']) ?></span>
               <?php endif; ?>
-            </td>
-            <td>
-              <div><?= htmlspecialchars($l['phone']) ?></div>
-              <?php if ($l['email']): ?><small class="text-muted"><?= htmlspecialchars($l['email']) ?></small><?php endif; ?>
-            </td>
-            <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($l['project_name'] ?? '') ?></span></td>
-            <td><?= $l['region_name'] ? htmlspecialchars($l['region_name']) : '<span class="text-muted">-</span>' ?></td>
-            <td>
               <?php if ($isAdLead): ?>
                 <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff;">
                   <i class="bi bi-instagram me-1"></i>Instagram
@@ -388,68 +437,170 @@ include __DIR__ . '/../../includes/header.php';
               <?php else: ?>
                 <span class="badge bg-light text-dark border"><?= ucfirst(str_replace('_',' ',$l['source'])) ?></span>
               <?php endif; ?>
-            </td>
-            <td><?= statusBadge($l['status']) ?></td>
-            <td class="small"><?= htmlspecialchars($l['assigned_name'] ?? '-') ?></td>
-            <td class="text-muted small text-nowrap"><?= date('d M Y', strtotime($l['created_at'])) ?></td>
-            <td>
-              <div class="btn-group btn-group-sm">
-                <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
-                <?php if (!$isInvestor): ?>
-                <button class="btn btn-outline-primary" onclick="editLead(<?= htmlspecialchars(json_encode($l)) ?>)" title="Edit"><i class="bi bi-pencil"></i></button>
-                <?php if ($l['status'] !== 'converted' && hasAccess('clients')): ?>
-                <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $l['id'] ?>" class="btn btn-outline-success" title="Convert to Client"><i class="bi bi-person-check"></i></a>
+              <?php if (!empty($l['assigned_name'])): ?>
+                <span class="badge bg-light text-muted border"><i class="bi bi-person me-1"></i><?= htmlspecialchars($l['assigned_name']) ?></span>
+              <?php endif; ?>
+            </div>
+            <div class="lead-card-phone-row">
+              <a href="tel:<?= htmlspecialchars($l['phone']) ?>" class="fw-semibold text-dark text-decoration-none">
+                <i class="bi bi-telephone me-1 text-success"></i><?= htmlspecialchars($l['phone']) ?>
+              </a>
+              <small class="text-muted"><?= date('d M Y', strtotime($l['created_at'])) ?></small>
+            </div>
+          </div>
+          <div class="lead-card-actions">
+            <a href="tel:<?= htmlspecialchars($l['phone']) ?>" class="btn btn-call btn-sm flex-grow-1">
+              <i class="bi bi-telephone-fill me-1"></i>Call
+            </a>
+            <?php if ($cleanPhone): ?>
+            <a href="https://wa.me/<?= $cleanPhone ?>" target="_blank" class="btn btn-whatsapp btn-sm px-3" title="WhatsApp Message">
+              <i class="bi bi-whatsapp"></i>
+            </a>
+            <?php endif; ?>
+            <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="btn btn-outline-primary btn-sm px-3" title="View Lead Details">
+              <i class="bi bi-eye"></i>
+            </a>
+            <?php if (!$isInvestor): ?>
+            <button type="button" class="btn btn-outline-secondary btn-sm px-2 btn-edit-lead" data-id="<?= $l['id'] ?>" title="Edit Lead">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    <?php endif; ?>
+  </div>
+</div>
+
+<!-- Desktop/Full Table View Container -->
+<div id="leadsTableContainer" class="d-none">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 datatable align-middle">
+          <thead class="table-light">
+            <tr>
+              <?php if ($isAdmin): ?>
+              <th data-orderable="false" data-searchable="false" width="40" class="text-center">
+                <input type="checkbox" id="selectAllLeads" class="form-check-input">
+              </th>
+              <?php endif; ?>
+              <th>Code</th><th>Lead</th><th>Contact</th><th>Project</th><th>Region</th><th>Source</th><th>Status</th><th>Assigned</th><th>Date</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <?php foreach ($leads as $l): 
+              $isAdLead = ($l['source'] === 'social_media');
+              $isUnviewedAdLead = ($isAdLead && empty($l['is_viewed']) && $l['status'] === 'new');
+            ?>
+            <tr class="<?= $isUnviewedAdLead ? 'table-danger bg-opacity-10 border-start border-4 border-danger' : '' ?>">
+              <?php if ($isAdmin): ?>
+              <td class="text-center">
+                <?php if ($l['status'] !== 'converted'): ?>
+                <input type="checkbox" value="<?= $l['id'] ?>" class="form-check-input lead-select-checkbox" data-status="<?= $l['status'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>">
+                <?php else: ?>
+                <input type="checkbox" class="form-check-input" disabled title="Converted leads cannot be modified or deleted.">
                 <?php endif; ?>
-                <?php if ($l['status'] !== 'converted' && $l['status'] !== 'false_lead'): ?>
-                <button type="button" class="btn btn-outline-secondary btn-mark-false" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Mark as False Lead"><i class="bi bi-x-octagon"></i></button>
+              </td>
+              <?php endif; ?>
+              <td>
+                <small class="text-muted font-monospace"><?= htmlspecialchars($l['lead_code'] ?? '') ?></small>
+              </td>
+              <td>
+                <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="fw-semibold text-decoration-none text-dark">
+                  <?= htmlspecialchars($l['name']) ?>
+                </a>
+                <?php if ($isUnviewedAdLead): ?>
+                  <span class="badge ms-1 shadow-sm" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); color: #fff; font-size: 0.65rem;">
+                    <i class="bi bi-star-fill me-1"></i>New Ad Lead
+                  </span>
                 <?php endif; ?>
+                <?php if ($l['company']): ?>
+                <div class="text-muted small"><i class="bi bi-building me-1"></i><?= htmlspecialchars($l['company']) ?></div>
                 <?php endif; ?>
-                <?php if ($isAdmin && in_array($l['status'], ['not_interested', 'false_lead'])): ?>
-                <button type="button" class="btn btn-outline-danger btn-delete-lead" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Delete"><i class="bi bi-trash"></i></button>
+              </td>
+              <td>
+                <div>
+                  <a href="tel:<?= htmlspecialchars($l['phone']) ?>" class="text-decoration-none text-dark">
+                    <i class="bi bi-telephone text-success me-1"></i><?= htmlspecialchars($l['phone']) ?>
+                  </a>
+                </div>
+                <?php if ($l['email']): ?><small class="text-muted"><?= htmlspecialchars($l['email']) ?></small><?php endif; ?>
+              </td>
+              <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><?= htmlspecialchars($l['project_name'] ?? '') ?></span></td>
+              <td><?= $l['region_name'] ? htmlspecialchars($l['region_name']) : '<span class="text-muted">-</span>' ?></td>
+              <td>
+                <?php if ($isAdLead): ?>
+                  <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff;">
+                    <i class="bi bi-instagram me-1"></i>Instagram
+                  </span>
+                <?php else: ?>
+                  <span class="badge bg-light text-dark border"><?= ucfirst(str_replace('_',' ',$l['source'])) ?></span>
                 <?php endif; ?>
-              </div>
-            </td>
-          </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
+              </td>
+              <td><?= statusBadge($l['status']) ?></td>
+              <td class="small"><?= htmlspecialchars($l['assigned_name'] ?? '-') ?></td>
+              <td class="text-muted small text-nowrap"><?= date('d M Y', strtotime($l['created_at'])) ?></td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="<?= BASE_URL ?>/modules/leads/view.php?id=<?= $l['id'] ?>" class="btn btn-outline-info" title="View"><i class="bi bi-eye"></i></a>
+                  <?php if (!$isInvestor): ?>
+                  <button type="button" class="btn btn-outline-primary btn-edit-lead" data-id="<?= $l['id'] ?>" title="Edit Lead"><i class="bi bi-pencil"></i></button>
+                  <?php if ($l['status'] !== 'converted' && hasAccess('clients')): ?>
+                  <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $l['id'] ?>" class="btn btn-outline-success" title="Convert to Client"><i class="bi bi-person-check"></i></a>
+                  <?php endif; ?>
+                  <?php if ($l['status'] !== 'converted' && $l['status'] !== 'false_lead'): ?>
+                  <button type="button" class="btn btn-outline-secondary btn-mark-false" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Mark as False Lead"><i class="bi bi-x-octagon"></i></button>
+                  <?php endif; ?>
+                  <?php endif; ?>
+                  <?php if ($isAdmin && in_array($l['status'], ['not_interested', 'false_lead'])): ?>
+                  <button type="button" class="btn btn-outline-danger btn-delete-lead" data-id="<?= $l['id'] ?>" data-name="<?= htmlspecialchars($l['name'], ENT_QUOTES) ?>" title="Delete"><i class="bi bi-trash"></i></button>
+                  <?php endif; ?>
+                </div>
+              </td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Add/Edit Lead Modal -->
-<div class="modal fade" id="leadModal" tabindex="-1">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <form method="POST" action="<?= BASE_URL ?>/modules/leads/save.php">
-        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-        <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
-        <input type="hidden" name="id" id="leadId" value="0">
-        <div class="modal-header">
-          <h5 class="modal-title" id="leadModalTitle">Add Lead</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
+<!-- Add/Edit Lead Modal (Mobile-Optimized Scrollable) -->
+<div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+    <form class="modal-content border-0 shadow-lg" method="POST" action="<?= BASE_URL ?>/modules/leads/save.php">
+      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '') ?>">
+      <input type="hidden" name="id" id="leadId" value="0">
+      <div class="modal-header bg-light border-bottom sticky-top py-3 px-4">
+        <h5 class="modal-title fw-bold text-dark" id="leadModalTitle">
+          <i class="bi bi-person-plus me-2 text-primary"></i>Add Lead
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label">Full Name *</label>
-              <input type="text" name="name" id="lName" class="form-control" required>
+              <input type="text" name="name" id="lName" class="form-control" required placeholder="e.g. John Doe">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label">Phone *</label>
-              <input type="text" name="phone" id="lPhone" class="form-control" required>
+              <input type="tel" name="phone" id="lPhone" class="form-control" inputmode="tel" required placeholder="+91 9876543210">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label">Email</label>
-              <input type="email" name="email" id="lEmail" class="form-control">
+              <input type="email" name="email" id="lEmail" class="form-control" inputmode="email" placeholder="client@example.com">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label">Company</label>
-              <input type="text" name="company" id="lCompany" class="form-control">
+              <input type="text" name="company" id="lCompany" class="form-control" placeholder="Company Name">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
               <label class="form-label">Designation</label>
-              <input type="text" name="designation" id="lDesignation" class="form-control">
+              <input type="text" name="designation" id="lDesignation" class="form-control" placeholder="e.g. Director">
             </div>
             <div class="col-md-4">
               <label class="form-label">Project *</label>
@@ -553,14 +704,20 @@ include __DIR__ . '/../../includes/header.php';
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Lead</button>
+        <div class="modal-footer bg-light border-top sticky-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+          <span class="text-muted small d-none d-sm-inline">
+            <i class="bi bi-info-circle me-1"></i>Fields marked with * are required.
+          </span>
+          <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary px-4 fw-semibold shadow-sm" id="btnSaveLead">
+              <i class="bi bi-check-circle me-1"></i>Save Lead
+            </button>
+          </div>
         </div>
       </form>
     </div>
   </div>
-</div>
 
 <div class="modal fade" id="csvModal" tabindex="-1">
   <div class="modal-dialog">
@@ -743,45 +900,134 @@ include __DIR__ . '/../../includes/header.php';
 </div>
 
 <script>
+function setLeadsView(mode) {
+  const cardsContainer = document.getElementById('leadsCardsContainer');
+  const tableContainer = document.getElementById('leadsTableContainer');
+  const btnCards = document.getElementById('btnViewCards');
+  const btnTable = document.getElementById('btnViewTable');
+
+  if (mode === 'cards') {
+    if (cardsContainer) cardsContainer.classList.remove('d-none');
+    if (tableContainer) tableContainer.classList.add('d-none');
+    if (btnCards) {
+      btnCards.classList.add('active', 'btn-white');
+      btnCards.classList.remove('btn-light', 'text-muted');
+    }
+    if (btnTable) {
+      btnTable.classList.remove('active', 'btn-white');
+      btnTable.classList.add('btn-light', 'text-muted');
+    }
+  } else {
+    if (cardsContainer) cardsContainer.classList.add('d-none');
+    if (tableContainer) tableContainer.classList.remove('d-none');
+    if (btnTable) {
+      btnTable.classList.add('active', 'btn-white');
+      btnTable.classList.remove('btn-light', 'text-muted');
+    }
+    if (btnCards) {
+      btnCards.classList.remove('active', 'btn-white');
+      btnCards.classList.add('btn-light', 'text-muted');
+    }
+    // Re-adjust DataTables columns if table was hidden
+    if (window.jQuery && $.fn && $.fn.DataTable) {
+      $('table.datatable').each(function () {
+        if ($.fn.DataTable.isDataTable(this)) {
+          $(this).DataTable().columns.adjust();
+        }
+      });
+    }
+  }
+  try {
+    localStorage.setItem('trias_leads_view_mode', mode);
+  } catch(e) {}
+}
+
+// Initialize view preference
+(function initLeadsView() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem('trias_leads_view_mode');
+  } catch(e) {}
+  
+  // If user hasn't explicitly set preference, use cards on mobile (< 768px) and table on desktop
+  if (!saved) {
+    saved = (window.innerWidth < 768) ? 'cards' : 'table';
+  }
+  setLeadsView(saved);
+})();
+
 const allPlans = <?= json_encode($db->query("SELECT id,project_id,name,price FROM plans WHERE status='active' ORDER BY name")->fetchAll()) ?>;
+const leadsDataMap = <?= json_encode(array_column($leads, null, 'id'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?> || {};
 
 function loadPlans(projectId, selectedId = '') {
   const sel = document.getElementById('lPlan');
+  if (!sel) return;
   sel.innerHTML = '<option value="">Not specified</option>';
-  allPlans.filter(p => p.project_id == projectId).forEach(p => {
-    const opt = new Option(`${p.name} (₹${parseFloat(p.price).toLocaleString()})`, p.id, p.id == selectedId, p.id == selectedId);
-    sel.add(opt);
-  });
-  $(sel).trigger('change');
+  if (projectId) {
+    allPlans.filter(p => String(p.project_id) === String(projectId)).forEach(p => {
+      const isSelected = Boolean(selectedId && String(p.id) === String(selectedId));
+      const opt = new Option(`${p.name} (₹${parseFloat(p.price).toLocaleString()})`, p.id, isSelected, isSelected);
+      sel.add(opt);
+    });
+  }
+  $(sel).val(selectedId || '').trigger('change.select2');
 }
 
-function editLead(l) {
+function editLead(idOrObj) {
+  let l = null;
+  if (typeof idOrObj === 'object' && idOrObj !== null) {
+    l = idOrObj;
+  } else if (typeof leadsDataMap !== 'undefined' && leadsDataMap[idOrObj]) {
+    l = leadsDataMap[idOrObj];
+  }
+  if (!l) {
+    console.error('Lead not found for editing:', idOrObj);
+    return;
+  }
+
   document.getElementById('leadId').value         = l.id;
-  document.getElementById('lName').value          = l.name;
-  document.getElementById('lPhone').value         = l.phone;
+  document.getElementById('lName').value          = l.name || '';
+  document.getElementById('lPhone').value         = l.phone || '';
   document.getElementById('lEmail').value         = l.email || '';
   document.getElementById('lCompany').value       = l.company || '';
   document.getElementById('lDesignation').value   = l.designation || '';
   document.getElementById('lWebsite').value       = l.website || '';
   document.getElementById('lAddress').value       = l.address || '';
-  document.getElementById('lSource').value        = l.source;
-  document.getElementById('lStatus').value        = l.status;
+  document.getElementById('lSource').value        = l.source || 'website';
+  document.getElementById('lStatus').value        = l.status || 'new';
   document.getElementById('lNotes').value         = l.notes || '';
   document.getElementById('lTrialEndDate').value   = l.trial_end_date || '';
   document.getElementById('lTrialLoginUrl').value  = l.trial_login_url || '';
   document.getElementById('lTrialUsername').value  = l.trial_username || '';
   document.getElementById('lTrialPassword').value  = l.trial_password || '';
   
-  $('#lProject').val(l.project_id).trigger('change');
-  $('#lRegion').val(l.region_id || '').trigger('change');
-  $('#lAssigned').val(l.assigned_to || '').trigger('change');
+  // Set Project, Region, Assigned without triggering full plan clearing
+  $('#lProject').val(l.project_id || '').trigger('change', [true]);
+  $('#lRegion').val(l.region_id || '').trigger('change.select2');
+  $('#lAssigned').val(l.assigned_to || '').trigger('change.select2');
+  
+  // Load plans specifically for this project and select the interested plan
   loadPlans(l.project_id, l.interested_plan_id);
   
+  // Update status (and trial fields display)
   $('#lStatus').trigger('change');
   
-  document.getElementById('leadModalTitle').textContent = 'Edit Lead';
-  new bootstrap.Modal(document.getElementById('leadModal')).show();
+  const titleEl = document.getElementById('leadModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<i class="bi bi-pencil-square me-2 text-primary"></i>Edit Lead: ' + $('<div>').text(l.name || '').html();
+  }
+
+  const modalEl = document.getElementById('leadModal');
+  const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modalInstance.show();
 }
+
+// Global delegated event for Edit Lead buttons in Cards, Tables, and DataTables redraws
+$(document).on('click', '.btn-edit-lead', function(e) {
+  e.preventDefault();
+  const id = $(this).data('id');
+  editLead(id);
+});
 
 <?php if ($isAdmin): ?>
 function updateBulkActionsBar() {
@@ -900,11 +1146,12 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#lStatus').on('change', function() {
     const status = this.value;
     const trialDiv = document.getElementById('lTrialFields');
+    if (!trialDiv) return;
     if (status === 'trial' || status === 'trial_ended') {
-      $(trialDiv).slideDown();
+      $(trialDiv).show();
       document.getElementById('lTrialEndDate').required = true;
     } else {
-      $(trialDiv).slideUp();
+      $(trialDiv).hide();
       document.getElementById('lTrialEndDate').required = false;
     }
   });
@@ -927,10 +1174,14 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('lTrialLoginUrl').value = '';
       document.getElementById('lTrialUsername').value = '';
       document.getElementById('lTrialPassword').value = '';
-      $('#lProject').val('').trigger('change');
-      $('#lRegion').val('').trigger('change');
-      $('#lAssigned').val('').trigger('change');
-      document.getElementById('leadModalTitle').textContent = 'Add Lead';
+      $('#lProject').val('').trigger('change', [true]);
+      $('#lRegion').val('').trigger('change.select2');
+      $('#lAssigned').val('').trigger('change.select2');
+      loadPlans('', '');
+      const titleEl = document.getElementById('leadModalTitle');
+      if (titleEl) {
+        titleEl.innerHTML = '<i class="bi bi-person-plus me-2 text-primary"></i>Add Lead';
+      }
       $('#lStatus').trigger('change');
     }
   });
@@ -972,7 +1223,15 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  $('#lProject').on('change', function() { loadPlans(this.value); });
+  $('#lProject').on('change', function(e, isProgrammatic) {
+    if (isProgrammatic) {
+      if ($(this).hasClass('select2-hidden-accessible')) {
+        $(this).trigger('change.select2');
+      }
+      return;
+    }
+    loadPlans(this.value);
+  });
 
   <?php if ($isAdmin): ?>
   // Checkbox select all logic

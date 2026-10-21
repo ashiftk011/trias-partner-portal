@@ -95,70 +95,181 @@ $pageTitle = 'Lead: ' . $lead['name'];
 include __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="<?= BASE_URL ?>/modules/leads/index.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <div class="flex-grow-1">
-    <h4 class="mb-0"><?= htmlspecialchars($lead['name']) ?> <small class="text-muted fs-6"><?= htmlspecialchars($lead['lead_code'] ?? '') ?></small></h4>
-    <span class="text-muted small"><?= htmlspecialchars($lead['company'] ?? '') ?></span>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="d-flex align-items-center gap-2 min-w-0">
+    <a href="<?= BASE_URL ?>/modules/leads/index.php" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Back to Leads">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div class="min-w-0">
+      <h4 class="mb-0 text-truncate"><?= htmlspecialchars($lead['name']) ?></h4>
+      <div class="d-flex align-items-center gap-2 mt-1">
+        <span class="badge bg-light text-dark font-monospace border"><?= htmlspecialchars($lead['lead_code'] ?? '') ?></span>
+        <?php if (!empty($lead['company'])): ?>
+          <span class="text-muted small text-truncate"><i class="bi bi-building me-1"></i><?= htmlspecialchars($lead['company']) ?></span>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
-  <?= statusBadge($lead['status']) ?>
-  <?php if ($lead['status'] !== 'converted' && hasAccess('clients')): ?>
-  <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $id ?>" class="btn btn-success">
-    <i class="bi bi-person-check me-1"></i>Convert to Client
-  </a>
-  <?php elseif ($lead['status'] === 'converted'): ?>
-  <?php if ($linkedClient): ?>
-  <a href="<?= BASE_URL ?>/modules/clients/view.php?id=<?= $linkedClient['id'] ?>" class="btn btn-outline-success">
-    <i class="bi bi-person-badge me-1"></i>View Client: <?= htmlspecialchars($linkedClient['client_code']) ?>
-  </a>
-  <?php endif; ?>
-  <span class="badge bg-success fs-6 p-2"><i class="bi bi-check-circle me-1"></i>Converted</span>
-  <?php endif; ?>
-  <?php if (!$isInvestor && $lead['status'] !== 'converted' && $lead['status'] !== 'false_lead'): ?>
-  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#markFalseModal">
-    <i class="bi bi-x-octagon me-1"></i>Mark as False Lead
-  </button>
-  <?php endif; ?>
-  <?php if ($canDelete): ?>
-  <form method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this lead? This action cannot be undone.')">
-    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-    <input type="hidden" name="id" value="<?= $id ?>">
-    <button type="submit" class="btn btn-danger">
-      <i class="bi bi-trash me-1"></i>Delete Lead
+  
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <div><?= statusBadge($lead['status']) ?></div>
+    <?php if ($lead['status'] !== 'converted' && hasAccess('clients')): ?>
+    <a href="<?= BASE_URL ?>/modules/leads/convert.php?id=<?= $id ?>" class="btn btn-sm btn-success fw-bold">
+      <i class="bi bi-person-check me-1"></i>Convert to Client
+    </a>
+    <?php elseif ($lead['status'] === 'converted'): ?>
+      <?php if ($linkedClient): ?>
+      <a href="<?= BASE_URL ?>/modules/clients/view.php?id=<?= $linkedClient['id'] ?>" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-person-badge me-1"></i>View Client
+      </a>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?php if (!$isInvestor && $lead['status'] !== 'converted' && $lead['status'] !== 'false_lead'): ?>
+    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#markFalseModal">
+      <i class="bi bi-x-octagon me-1"></i>Mark False
     </button>
-  </form>
-  <?php endif; ?>
+    <?php endif; ?>
+    <?php if ($canDelete): ?>
+    <form method="POST" action="<?= BASE_URL ?>/modules/leads/delete.php" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this lead? This action cannot be undone.')">
+      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+      <input type="hidden" name="id" value="<?= $id ?>">
+      <button type="submit" class="btn btn-sm btn-danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+    </form>
+    <?php endif; ?>
+  </div>
 </div>
 
 <?php displayFlash(); ?>
 
-<div class="row g-4">
+<?php
+$cleanPhone = preg_replace('/\D/', '', $lead['phone'] ?? '');
+?>
+<!-- Quick Contact Bar for Telecallers -->
+<div class="mobile-lead-quickbar d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <div class="stat-icon bg-success-subtle text-success rounded-3 p-2">
+      <i class="bi bi-telephone-outbound fs-4"></i>
+    </div>
+    <div>
+      <div class="small text-muted fw-medium">Direct Contact</div>
+      <div class="fw-bold fs-5 text-dark font-monospace"><?= htmlspecialchars($lead['phone']) ?></div>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 w-100 w-sm-auto">
+    <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="btn btn-call flex-grow-1 px-3 py-2">
+      <i class="bi bi-telephone-fill me-2"></i>Call Now
+    </a>
+    <?php if ($cleanPhone): ?>
+    <a href="https://wa.me/<?= $cleanPhone ?>" target="_blank" class="btn btn-whatsapp flex-grow-1 px-3 py-2">
+      <i class="bi bi-whatsapp me-2"></i>WhatsApp
+    </a>
+    <?php endif; ?>
+    <?php if (!empty($lead['email'])): ?>
+    <a href="mailto:<?= htmlspecialchars($lead['email']) ?>" class="btn btn-outline-secondary px-3 py-2" title="Send Email">
+      <i class="bi bi-envelope"></i>
+    </a>
+    <?php endif; ?>
+  </div>
+</div>
+
+<div class="row g-3">
   <!-- Lead Details -->
-  <div class="col-xl-4">
+  <div class="col-12 col-xl-4">
     <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-person me-2 text-primary"></i>Lead Information</div>
+      <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-person me-2 text-primary"></i>Lead Information</span>
+        <span class="badge bg-light text-dark border"><?= htmlspecialchars($lead['project_name']) ?></span>
+      </div>
       <div class="card-body">
-        <?php
-        $fields = [
-          'Phone'       => $lead['phone'],
-          'Email'       => $lead['email'] ?: '-',
-          'Designation' => $lead['designation'] ?: '-',
-          'Project'     => $lead['project_name'],
-          'Region'      => $lead['region_name'] ?: 'All India',
-          'Source'      => ucfirst(str_replace('_',' ',$lead['source'])),
-          'Assigned To' => $lead['assigned_name'] ?: 'Unassigned',
-          'Interested Plan' => $lead['plan_name'] ? $lead['plan_name'].' (₹'.number_format($lead['plan_price'],2).')' : '-',
-          'Created'     => date('d M Y H:i', strtotime($lead['created_at'])),
-          'Updated'     => date('d M Y H:i', strtotime($lead['updated_at'])),
-        ];
-        foreach ($fields as $label => $value): ?>
-        <div class="d-flex justify-content-between border-bottom py-2">
-          <span class="text-muted small"><?= $label ?></span>
-          <span class="fw-semibold small text-end"><?= htmlspecialchars($value) ?></span>
+        <div class="d-flex justify-content-between border-bottom py-2 align-items-center">
+          <span class="text-muted small">Phone</span>
+          <div class="d-flex align-items-center gap-2">
+            <a href="tel:<?= htmlspecialchars($lead['phone']) ?>" class="fw-semibold small text-decoration-none text-dark">
+              <i class="bi bi-telephone text-success me-1"></i><?= htmlspecialchars($lead['phone']) ?>
+            </a>
+            <button type="button" class="btn btn-link p-0 text-muted" onclick="copyTextValue('<?= htmlspecialchars($lead['phone']) ?>')" title="Copy Phone">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
         </div>
-        <?php endforeach; ?>
-        <?php if ($lead['notes']): ?>
-        <div class="mt-3"><strong class="small">Notes:</strong><p class="text-muted small mt-1"><?= nl2br(htmlspecialchars($lead['notes'])) ?></p></div>
+
+        <div class="d-flex justify-content-between border-bottom py-2 align-items-center">
+          <span class="text-muted small">Email</span>
+          <span class="fw-semibold small text-end">
+            <?php if (!empty($lead['email'])): ?>
+              <a href="mailto:<?= htmlspecialchars($lead['email']) ?>" class="text-decoration-none">
+                <?= htmlspecialchars($lead['email']) ?>
+              </a>
+            <?php else: ?>
+              <span class="text-muted">-</span>
+            <?php endif; ?>
+          </span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Company</span>
+          <span class="fw-semibold small text-end"><?= htmlspecialchars($lead['company'] ?: '-') ?></span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Designation</span>
+          <span class="fw-semibold small text-end"><?= htmlspecialchars($lead['designation'] ?: '-') ?></span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Region</span>
+          <span class="fw-semibold small text-end"><?= htmlspecialchars($lead['region_name'] ?: 'All India') ?></span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Source</span>
+          <span class="fw-semibold small text-end">
+            <?php if ($lead['source'] === 'social_media'): ?>
+              <span class="badge" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); color: #fff;">
+                <i class="bi bi-instagram me-1"></i>Instagram
+              </span>
+            <?php else: ?>
+              <?= ucfirst(str_replace('_',' ',$lead['source'])) ?>
+            <?php endif; ?>
+          </span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Assigned To</span>
+          <span class="fw-semibold small text-end"><?= htmlspecialchars($lead['assigned_name'] ?: 'Unassigned') ?></span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Interested Plan</span>
+          <span class="fw-semibold small text-end">
+            <?= $lead['plan_name'] ? htmlspecialchars($lead['plan_name']).' (₹'.number_format($lead['plan_price'],2).')' : '-' ?>
+          </span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Created</span>
+          <span class="fw-semibold small text-end"><?= date('d M Y H:i', strtotime($lead['created_at'])) ?></span>
+        </div>
+
+        <div class="d-flex justify-content-between border-bottom py-2">
+          <span class="text-muted small">Last Updated</span>
+          <span class="fw-semibold small text-end"><?= date('d M Y H:i', strtotime($lead['updated_at'])) ?></span>
+        </div>
+
+        <?php if (!empty($lead['address'])): ?>
+        <div class="mt-3 border-top pt-2">
+          <strong class="small text-dark d-block mb-1"><i class="bi bi-geo-alt me-1 text-primary"></i>Address:</strong>
+          <p class="text-muted small mb-0"><?= nl2br(htmlspecialchars($lead['address'])) ?></p>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($lead['notes'])): ?>
+        <div class="mt-3 border-top pt-2">
+          <strong class="small text-dark d-block mb-1"><i class="bi bi-journal-text me-1 text-primary"></i>Initial Notes:</strong>
+          <p class="text-muted small mb-0"><?= nl2br(htmlspecialchars($lead['notes'])) ?></p>
+        </div>
         <?php endif; ?>
       </div>
     </div>
@@ -231,29 +342,49 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 
   <!-- Responses + Feed Response -->
-  <div class="col-xl-8">
+  <div class="col-12 col-xl-8">
     <!-- Feed Response Form -->
     <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold py-3"><i class="bi bi-chat-left-text me-2 text-primary"></i>Feed Response</div>
+      <div class="card-header bg-white fw-semibold py-3 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-chat-left-text me-2 text-primary"></i>Feed Response / Log Activity</span>
+        <span class="text-muted small">Record calls, notes, or status changes</span>
+      </div>
       <div class="card-body">
         <form method="POST">
           <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
           <input type="hidden" name="action" value="add_response">
+          
+          <!-- Touch Segmented Buttons for Response Type -->
+          <label class="form-label fw-semibold small text-dark mb-2">Interaction Type</label>
+          <input type="hidden" name="response_type" id="responseTypeInput" value="call">
+          <div class="response-type-pill-group mb-3">
+            <button type="button" class="response-type-btn active" data-type="call" onclick="setResponseType('call', this)">
+              <i class="bi bi-telephone-fill"></i>
+              <span>Call</span>
+            </button>
+            <button type="button" class="response-type-btn" data-type="whatsapp" onclick="setResponseType('whatsapp', this)">
+              <i class="bi bi-whatsapp"></i>
+              <span>WhatsApp</span>
+            </button>
+            <button type="button" class="response-type-btn" data-type="email" onclick="setResponseType('email', this)">
+              <i class="bi bi-envelope-fill"></i>
+              <span>Email</span>
+            </button>
+            <button type="button" class="response-type-btn" data-type="meeting" onclick="setResponseType('meeting', this)">
+              <i class="bi bi-calendar-event-fill"></i>
+              <span>Meeting</span>
+            </button>
+            <button type="button" class="response-type-btn" data-type="other" onclick="setResponseType('other', this)">
+              <i class="bi bi-chat-dots-fill"></i>
+              <span>Other</span>
+            </button>
+          </div>
+
           <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">Response Type</label>
-              <select name="response_type" class="form-select">
-                <option value="call">Call</option>
-                <option value="email">Email</option>
-                <option value="meeting">Meeting</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Update Status</label>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold small text-dark">Update Status</label>
               <select name="status_updated" id="statusUpdateSelect" class="form-select">
-                <option value="">-- No Change --</option>
+                <option value="">-- No Change (Keep <?= ucwords(str_replace('_',' ',$lead['status'])) ?>) --</option>
                 <option value="contacted">Contacted</option>
                 <option value="interested">Interested</option>
                 <option value="trial">Trial</option>
@@ -264,8 +395,8 @@ include __DIR__ . '/../../includes/header.php';
                 <option value="false_lead">False Lead</option>
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Next Follow-up Date</label>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold small text-dark">Next Follow-up Date</label>
               <input type="date" name="next_followup" class="form-control" min="<?= date('Y-m-d') ?>">
             </div>
             
@@ -277,19 +408,19 @@ include __DIR__ . '/../../includes/header.php';
                 </div>
                 <div class="card-body pt-0">
                   <div class="row g-3">
-                    <div class="col-md-3">
+                    <div class="col-12 col-md-3">
                       <label class="form-label">Trial End Date *</label>
                       <input type="date" name="trial_end_date" id="feedTrialEndDate" class="form-control">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-md-3">
                       <label class="form-label">Trial Login URL</label>
                       <input type="url" name="trial_login_url" id="feedTrialLoginUrl" class="form-control" placeholder="https://example.com/login">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-md-3">
                       <label class="form-label">Trial Username</label>
                       <input type="text" name="trial_username" id="feedTrialUsername" class="form-control" placeholder="Username">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-md-3">
                       <label class="form-label">Trial Password</label>
                       <input type="text" name="trial_password" id="feedTrialPassword" class="form-control" placeholder="Password">
                     </div>
@@ -299,12 +430,14 @@ include __DIR__ . '/../../includes/header.php';
             </div>
 
             <div class="col-12">
-              <label class="form-label">Response / Notes *</label>
-              <textarea name="response" class="form-control" rows="3" required placeholder="Describe what happened in this interaction..."></textarea>
+              <label class="form-label fw-semibold small text-dark">Response / Notes *</label>
+              <textarea name="response" class="form-control" rows="3" required placeholder="Describe conversation details, client requirements, or next steps..."></textarea>
             </div>
           </div>
           <div class="mt-3 text-end">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit Response</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold w-100 w-sm-auto">
+              <i class="bi bi-send me-2"></i>Submit Response
+            </button>
           </div>
         </form>
       </div>
@@ -363,6 +496,18 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+function setResponseType(type, btn) {
+  document.getElementById('responseTypeInput').value = type;
+  document.querySelectorAll('.response-type-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function copyTextValue(val) {
+  navigator.clipboard.writeText(val).then(() => {
+    alert('Copied to clipboard: ' + val);
+  }).catch(() => {});
+}
+
 function copyText(elementId) {
   const text = document.getElementById(elementId).innerText;
   navigator.clipboard.writeText(text).then(() => {
@@ -401,7 +546,7 @@ function togglePassword() {
 
 <!-- Mark False Lead Modal -->
 <div class="modal fade" id="markFalseModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" action="<?= BASE_URL ?>/modules/leads/mark_false.php">
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">

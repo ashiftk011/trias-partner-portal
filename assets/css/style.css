@@ -1082,20 +1082,86 @@ div.dataTables_wrapper div.dataTables_length select {
 }
 
 /* Mobile Devices (<= 768px) */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1045;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.sidebar-backdrop.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+body.sidebar-drawer-open {
+  overflow: hidden !important;
+}
+
 @media (max-width: 768px) {
   .sidebar {
-    width: 0;
-    overflow: hidden;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    width: 280px !important;
+    max-width: 82vw !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: 1050 !important;
+    box-shadow: none;
   }
 
   .sidebar.mobile-open {
-    width: var(--sidebar-width);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3);
+    transform: translateX(0) !important;
+    box-shadow: 14px 0 40px rgba(0, 0, 0, 0.4) !important;
   }
 
   .top-navbar {
     left: 0 !important;
     width: 100% !important;
+    height: 58px;
+    z-index: 1040;
+  }
+
+  .wrapper {
+    padding-top: 58px;
+  }
+
+  .top-navbar-title {
+    font-size: 0.98rem;
+    max-width: 160px;
+  }
+
+  .top-navbar-inner {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .top-navbar-toggle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .top-navbar-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+
+  .top-navbar-user {
+    padding: 3px 8px 3px 3px;
+    border-radius: 10px;
+    gap: 6px;
   }
 
   .navbar-search {
@@ -1109,13 +1175,286 @@ div.dataTables_wrapper div.dataTables_length select {
   }
 
   .content-area, .content-area.p-4 {
-    padding: 0.85rem !important;
+    padding: 0.75rem !important;
   }
 
-  .top-navbar-inner {
-    padding: 0 12px;
+  /* Prevent iOS zoom on input focus */
+  input[type="text"], input[type="password"], input[type="email"],
+  input[type="tel"], input[type="url"], input[type="date"],
+  select, textarea, .form-control, .form-select {
+    font-size: 16px !important;
+  }
+
+  .form-control, .form-select {
+    min-height: 44px;
+    border-radius: 10px;
+  }
+
+  .btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-sm {
+    min-height: 34px;
+  }
+
+  /* Stat cards on mobile */
+  .stat-card .card-body {
+    padding: 12px !important;
+  }
+
+  .stat-icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+  }
+
+  .stat-icon i {
+    font-size: 1.25rem !important;
+  }
+
+  .stat-value {
+    font-size: 1.25rem !important;
+  }
+
+  .stat-label {
+    font-size: 0.72rem !important;
+  }
+
+  /* Modals on mobile */
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .modal-dialog.modal-fullscreen-mobile {
+    margin: 0;
+    max-width: 100%;
+    min-height: 100%;
+  }
+
+  .modal-content {
+    border-radius: 18px !important;
+  }
+
+  .modal-header {
+    padding: 14px 18px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
   }
 }
+
+/* Very Small Mobile (< 400px) */
+@media (max-width: 400px) {
+  .top-navbar-title {
+    max-width: 125px;
+    font-size: 0.9rem;
+  }
+  .content-area, .content-area.p-4 {
+    padding: 0.5rem !important;
+  }
+}
+
+/* ============================================================
+   TELECALLER & LEADS MOBILE UI STYLES
+   ============================================================ */
+
+/* Horizontally scrollable status pill filter bar */
+.status-pill-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.status-pill-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.status-pill-link {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  text-decoration: none !important;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-pill-link:active {
+  transform: scale(0.96);
+}
+
+.status-pill-link.active-filter {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 700;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Quick Action Telecaller Buttons */
+.btn-call {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff !important;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+}
+
+.btn-call:hover, .btn-call:active {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff !important;
+}
+
+.btn-whatsapp {
+  background: #25D366;
+  color: #ffffff !important;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 3px 10px rgba(37, 211, 102, 0.3);
+}
+
+.btn-whatsapp:hover, .btn-whatsapp:active {
+  background: #1ebc57;
+  color: #ffffff !important;
+}
+
+/* Mobile Lead Card Component */
+.lead-mobile-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.lead-mobile-card:active {
+  border-color: #cbd5e1;
+}
+
+.lead-mobile-card.is-new-ad-lead {
+  border-left: 4px solid #dc2743;
+  background: linear-gradient(90deg, rgba(220, 39, 67, 0.03) 0%, #ffffff 100%);
+}
+
+.lead-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lead-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+.lead-card-title:hover {
+  color: var(--primary);
+}
+
+.lead-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.lead-card-phone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 7px 10px;
+  margin-bottom: 10px;
+  font-size: 0.88rem;
+}
+
+.lead-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 10px;
+  margin-top: 8px;
+}
+
+/* Response Type Segmented Touch Buttons */
+.response-type-pill-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 576px) {
+  .response-type-pill-group {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.response-type-btn {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.response-type-btn i {
+  font-size: 1.25rem;
+}
+
+.response-type-btn.active {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+/* Mobile Quick Contact Floating or Sticky Bar on Lead View */
+.mobile-lead-quickbar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+}
+
 
 /* Custom Scrollbars */
 .sidebar::-webkit-scrollbar,
@@ -1152,4 +1491,63 @@ div.dataTables_wrapper .col-sm-12::-webkit-scrollbar-thumb {
 div.dataTables_wrapper > .row:nth-child(2)::-webkit-scrollbar-thumb:hover,
 div.dataTables_wrapper .col-sm-12::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ============================================================
+   MODAL SCROLLABLE & STICKY FOOTER STYLES
+   Ensures Save button is always visible on web & mobile
+   ============================================================ */
+.modal-dialog-scrollable {
+  max-height: calc(100vh - 2rem) !important;
+}
+
+@media (min-width: 576px) {
+  .modal-dialog-scrollable {
+    max-height: calc(100vh - 3.5rem) !important;
+  }
+}
+
+.modal-dialog-scrollable .modal-content,
+.modal-dialog-scrollable form.modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: calc(100vh - 2rem) !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 576px) {
+  .modal-dialog-scrollable .modal-content,
+  .modal-dialog-scrollable form.modal-content {
+    max-height: calc(100vh - 3.5rem) !important;
+  }
+}
+
+.modal-dialog-scrollable .modal-header,
+.modal-dialog-scrollable form.modal-content > .modal-header {
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1020 !important;
+  background-color: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.modal-dialog-scrollable .modal-body,
+.modal-dialog-scrollable form.modal-content > .modal-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-dialog-scrollable .modal-footer,
+.modal-dialog-scrollable form.modal-content > .modal-footer {
+  flex-shrink: 0 !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 1020 !important;
+  background-color: #f8fafc !important;
+  border-top: 1px solid #e2e8f0 !important;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
 }

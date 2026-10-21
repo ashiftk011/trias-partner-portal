@@ -87,15 +87,20 @@ try {
 
 ?>
 <nav id="sidebar" class="sidebar">
-  <div class="sidebar-brand">
-    <?php if (!empty($sidebarBrandIcon)): ?>
-      <img src="<?= BASE_URL . '/' . htmlspecialchars($sidebarBrandIcon) ?>" alt="App Icon" class="sidebar-brand-logo">
-    <?php else: ?>
-      <div class="sidebar-brand-icon">
-        <i class="bi bi-diagram-3-fill"></i>
-      </div>
-    <?php endif; ?>
-    <span class="sidebar-brand-text"><?= htmlspecialchars($sidebarBrandName) ?></span>
+  <div class="sidebar-brand d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2 overflow-hidden">
+      <?php if (!empty($sidebarBrandIcon)): ?>
+        <img src="<?= BASE_URL . '/' . htmlspecialchars($sidebarBrandIcon) ?>" alt="App Icon" class="sidebar-brand-logo">
+      <?php else: ?>
+        <div class="sidebar-brand-icon">
+          <i class="bi bi-diagram-3-fill"></i>
+        </div>
+      <?php endif; ?>
+      <span class="sidebar-brand-text"><?= htmlspecialchars($sidebarBrandName) ?></span>
+    </div>
+    <button type="button" class="btn btn-sm text-white-50 p-1 d-md-none sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close sidebar">
+      <i class="bi bi-x-lg fs-5"></i>
+    </button>
   </div>
 
   <?php foreach ($navSections as $section): ?>
