@@ -13,7 +13,7 @@ $investorProjectId    = $isInvestor ? getInvestorProjectId() : 0;
 $telecallProjectIds   = $isTelecall ? getTelecallProjectIds() : [];
 
 // Persist & restore filters across requests/edits
-restorePageFilters('leads', ['project_id', 'status', 'region_id', 'source', 'q']);
+restorePageFilters('leads', ['project_id', 'status', 'region_id', 'source', 'assigned_to', 'q']);
 
 // Filters
 if ($isInvestor) {
@@ -25,10 +25,11 @@ if ($isInvestor) {
 } else {
     $filterProject = isset($_GET['project_id']) ? (int)$_GET['project_id'] : 0;
 }
-$filterStatus  = $_GET['status'] ?? '';
-$filterRegion  = isset($_GET['region_id']) ? (int)$_GET['region_id'] : 0;
-$filterSource  = $_GET['source'] ?? '';
-$filterSearch  = trim($_GET['q'] ?? '');
+$filterStatus   = $_GET['status'] ?? '';
+$filterRegion   = isset($_GET['region_id']) ? (int)$_GET['region_id'] : 0;
+$filterSource   = $_GET['source'] ?? '';
+$filterAssigned = $_GET['assigned_to'] ?? '';
+$filterSearch   = trim($_GET['q'] ?? '');
 
 $sql = "SELECT l.*, p.name as project_name, r.name as region_name, u.name as assigned_name
         FROM leads l
@@ -54,6 +55,12 @@ if ($filterProject) { $sql .= " AND l.project_id=?"; $params[] = $filterProject;
 if ($filterStatus)  { $sql .= " AND l.status=?";     $params[] = $filterStatus; }
 if ($filterRegion)  { $sql .= " AND l.region_id=?";  $params[] = $filterRegion; }
 if ($filterSource)  { $sql .= " AND l.source=?";     $params[] = $filterSource; }
+if ($filterAssigned === 'unassigned' || $filterAssigned === '0') {
+    $sql .= " AND (l.assigned_to IS NULL OR l.assigned_to = 0)";
+} elseif (is_numeric($filterAssigned) && (int)$filterAssigned > 0) {
+    $sql .= " AND l.assigned_to=?";
+    $params[] = (int)$filterAssigned;
+}
 if ($filterSearch)  { $sql .= " AND (l.name LIKE ? OR l.phone LIKE ? OR l.company LIKE ?)"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; }
 
 $sql .= " ORDER BY l.created_at DESC";
@@ -241,23 +248,41 @@ include __DIR__ . '/../../includes/header.php';
     'false_lead'     => 'dark'
   ];
   ?>
-  <a href="?clear=1" class="status-pill-link bg-light text-dark border <?= (!$filterStatus && !$filterSource) ? 'active-filter' : '' ?>">
+  <a href="?clear=1" class="status-pill-link bg-light text-dark border <?= (!$filterStatus && !$filterSource && $filterAssigned === '') ? 'active-filter' : '' ?>">
     <i class="bi bi-layers-fill me-1 text-primary"></i>All Leads <span class="badge bg-secondary ms-1"><?= count($leads) ?></span>
   </a>
   <?php foreach ($statusColors as $st => $cls): 
     $isActive = ($filterStatus === $st);
   ?>
-  <a href="?status=<?= $st ?><?= $filterProject?"&project_id=$filterProject":'' ?><?= $filterSource?"&source=$filterSource":'' ?>" 
+  <a href="?status=<?= $st ?><?= $filterProject ? "&project_id=$filterProject" : '' ?><?= $filterRegion ? "&region_id=$filterRegion" : '' ?><?= $filterSource ? "&source=" . urlencode($filterSource) : '' ?><?= $filterAssigned !== '' ? "&assigned_to=" . urlencode($filterAssigned) : '' ?>" 
      class="status-pill-link bg-<?= $cls ?> text-white <?= $isActive ? 'active-filter' : '' ?>">
     <?= ucwords(str_replace('_',' ',$st)) ?> <span class="badge bg-dark bg-opacity-25 ms-1"><?= $counts[$st] ?? 0 ?></span>
   </a>
   <?php endforeach; ?>
   <?php if ($filterSource): ?>
-  <a href="?source=<?= urlencode($filterSource) ?>" class="status-pill-link text-white shadow-sm active-filter" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
+  <a href="?source=<?= urlencode($filterSource) ?><?= $filterProject ? "&project_id=$filterProject" : '' ?><?= $filterRegion ? "&region_id=$filterRegion" : '' ?><?= $filterAssigned !== '' ? "&assigned_to=" . urlencode($filterAssigned) : '' ?>" class="status-pill-link text-white shadow-sm active-filter" style="background: linear-gradient(45deg, #f09433, #dc2743, #bc1888);">
     <i class="bi bi-instagram me-1"></i>Source: <?= htmlspecialchars($filterSource) ?>
   </a>
   <?php endif; ?>
-  <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
+  <?php if ($filterAssigned !== ''): 
+    $assignedLabel = ($filterAssigned === 'unassigned' || $filterAssigned === '0') ? 'Unassigned' : '';
+    if (!$assignedLabel) {
+      foreach ($agents as $ag) {
+        if ((string)$ag['id'] === (string)$filterAssigned) {
+          $assignedLabel = $ag['name'];
+          break;
+        }
+      }
+    }
+    if (!$assignedLabel && is_numeric($filterAssigned)) {
+      $assignedLabel = 'User #' . $filterAssigned;
+    }
+  ?>
+  <a href="?assigned_to=<?= urlencode($filterAssigned) ?><?= $filterProject ? "&project_id=$filterProject" : '' ?><?= $filterRegion ? "&region_id=$filterRegion" : '' ?><?= $filterSource ? "&source=" . urlencode($filterSource) : '' ?>" class="status-pill-link bg-secondary text-white shadow-sm active-filter">
+    <i class="bi bi-person-fill me-1"></i>Assignee: <?= htmlspecialchars($assignedLabel ?: $filterAssigned) ?>
+  </a>
+  <?php endif; ?>
+  <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterAssigned !== '' || $filterSearch): ?>
   <a href="?clear=1" class="status-pill-link bg-danger text-white border-0">
     <i class="bi bi-x-circle me-1"></i>Clear Filters
   </a>
@@ -271,6 +296,7 @@ if ($filterProject) $activeFilterCount++;
 if ($filterRegion) $activeFilterCount++;
 if ($filterSource) $activeFilterCount++;
 if ($filterStatus) $activeFilterCount++;
+if ($filterAssigned !== '') $activeFilterCount++;
 ?>
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-body p-2 p-md-3">
@@ -293,7 +319,7 @@ if ($filterStatus) $activeFilterCount++;
           <button type="submit" class="btn btn-sm btn-primary">
             <i class="bi bi-search me-1"></i>Search & Filter
           </button>
-          <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterSearch): ?>
+          <?php if ($filterStatus || $filterProject || $filterRegion || $filterSource || $filterAssigned !== '' || $filterSearch): ?>
           <a href="?clear=1" class="btn btn-sm btn-outline-danger">
             <i class="bi bi-x me-1"></i>Clear
           </a>
@@ -304,7 +330,7 @@ if ($filterStatus) $activeFilterCount++;
       <!-- Expandable Filters (Collapsed on Mobile by default, always visible on Desktop) -->
       <div class="collapse d-md-block <?= $activeFilterCount > 0 ? 'show' : '' ?> mt-2" id="moreFiltersCollapse">
         <div class="row g-2 pt-2 border-top">
-          <div class="col-6 col-md-3">
+          <div class="col-6 col-md-4 col-lg">
             <label class="form-label small text-muted mb-1 d-md-none">Project</label>
             <?php if ($isInvestor): ?>
               <input type="hidden" name="project_id" value="<?= $investorProjectId ?>">
@@ -321,7 +347,19 @@ if ($filterStatus) $activeFilterCount++;
             </select>
             <?php endif; ?>
           </div>
-          <div class="col-6 col-md-3">
+          <div class="col-6 col-md-4 col-lg">
+            <label class="form-label small text-muted mb-1 d-md-none">Assignee</label>
+            <select name="assigned_to" class="form-select form-select-sm">
+              <option value="">All Assignees</option>
+              <option value="unassigned" <?= ($filterAssigned === 'unassigned' || $filterAssigned === '0') ? 'selected' : '' ?>>-- Unassigned --</option>
+              <?php foreach ($agents as $ag): ?>
+              <option value="<?= $ag['id'] ?>" <?= (string)$filterAssigned === (string)$ag['id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars($ag['name']) ?><?= ((int)$ag['id'] === (int)($user['id'] ?? 0)) ? ' (Me)' : '' ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-6 col-md-4 col-lg">
             <label class="form-label small text-muted mb-1 d-md-none">Region</label>
             <select name="region_id" class="form-select form-select-sm">
               <option value="">All Regions</option>
@@ -330,7 +368,7 @@ if ($filterStatus) $activeFilterCount++;
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="col-6 col-md-3">
+          <div class="col-6 col-md-4 col-lg">
             <label class="form-label small text-muted mb-1 d-md-none">Source</label>
             <select name="source" class="form-select form-select-sm">
               <option value="">All Sources</option>
@@ -343,7 +381,7 @@ if ($filterStatus) $activeFilterCount++;
               <option value="other" <?= $filterSource==='other'?'selected':'' ?>>Other</option>
             </select>
           </div>
-          <div class="col-6 col-md-3">
+          <div class="col-12 col-sm-6 col-md-4 col-lg">
             <label class="form-label small text-muted mb-1 d-md-none">Status</label>
             <select name="status" class="form-select form-select-sm">
               <option value="">All Statuses</option>
