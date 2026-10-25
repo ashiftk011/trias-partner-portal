@@ -75,6 +75,7 @@ CREATE TABLE leads (
     trial_login_url VARCHAR(255) NULL,
     trial_username VARCHAR(100) NULL,
     trial_password VARCHAR(100) NULL,
+    next_followup DATE NULL,
     notes TEXT,
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -576,6 +577,88 @@ CREATE TABLE company_assets (
     FOREIGN KEY (assigned_to_employee_id) REFERENCES employees(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Email Outreaches (Cold Email Tracking & Conversion)
+CREATE TABLE email_outreaches (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    outreach_code VARCHAR(30) UNIQUE NOT NULL,
+    project_id INT NOT NULL,
+    contact_name VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    phone VARCHAR(30) NULL,
+    company VARCHAR(200) NULL,
+    designation VARCHAR(100) NULL,
+    website VARCHAR(255) NULL,
+    linkedin_url VARCHAR(255) NULL,
+    country VARCHAR(100) NULL,
+    city VARCHAR(100) NULL,
+    campaign_name VARCHAR(150) NULL,
+    email_subject VARCHAR(255) NULL,
+    outreach_date DATE NOT NULL,
+    first_sent_at DATETIME NULL,
+    followup_count INT NOT NULL DEFAULT 0,
+    last_followup_date DATE NULL,
+    status ENUM('sent', 'replied', 'bounced', 'not_interested', 'converted') NOT NULL DEFAULT 'sent',
+    response_type ENUM('none', 'meeting_scheduled', 'demo_requested', 'interested_more_info', 'pricing_inquiry', 'call_back_later', 'referral', 'not_interested', 'other') NOT NULL DEFAULT 'none',
+    response_summary TEXT NULL,
+    replied_at DATETIME NULL,
+    meeting_date DATETIME NULL,
+    next_followup_date DATE NULL,
+    converted_lead_id INT NULL,
+    notes TEXT NULL,
+    assigned_to INT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_outreach_project (project_id),
+    INDEX idx_outreach_status (status),
+    INDEX idx_outreach_response (response_type),
+    INDEX idx_outreach_email (email),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (converted_lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE email_outreach_activities (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    outreach_id INT NOT NULL,
+    activity_type ENUM('initial_email', 'follow_up_sent', 'reply_received', 'call', 'meeting_booked', 'demo_booked', 'note', 'converted_to_lead') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    notes TEXT NULL,
+    scheduled_at DATETIME NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_activity_outreach (outreach_id),
+    FOREIGN KEY (outreach_id) REFERENCES email_outreaches(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Lead Call Recordings
+CREATE TABLE lead_call_recordings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    lead_id INT NOT NULL,
+    response_id INT NULL,
+    title VARCHAR(200) NOT NULL,
+    call_date DATETIME NOT NULL,
+    duration_seconds INT NULL DEFAULT 0,
+    call_type ENUM('outbound', 'inbound') NOT NULL DEFAULT 'outbound',
+    call_status ENUM('connected', 'no_answer', 'busy', 'voicemail', 'wrong_number') NOT NULL DEFAULT 'connected',
+    file_path VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    file_size INT NULL,
+    external_url VARCHAR(500) NULL,
+    notes TEXT NULL,
+    recorded_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_recordings_lead (lead_id),
+    INDEX idx_recordings_date (call_date),
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (response_id) REFERENCES lead_responses(id) ON DELETE SET NULL,
+    FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE CASCADE
+);
+
 
 
 

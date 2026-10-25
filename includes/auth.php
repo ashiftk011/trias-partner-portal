@@ -7,12 +7,12 @@ require_once __DIR__ . '/../config/db.php';
 
 // Role permission map
 const ROLE_PERMISSIONS = [
-    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','payments','settings','proposals','quotations','demos','regions','hr','expenses','accounts'],
+    'admin'    => ['dashboard','users','projects','plans','leads','clients','renewals','invoices','payments','settings','proposals','quotations','demos','regions','hr','expenses','accounts','outreach'],
     'finance'  => ['dashboard','invoices','clients','renewals','payments','hr','expenses','accounts'],
     'accounts' => ['dashboard','payments','invoices','hr','expenses','accounts'],
-    'telecall' => ['dashboard','leads'],
+    'telecall' => ['dashboard','leads','outreach'],
     'investor' => ['dashboard','clients','leads'],
-    'csm'      => ['dashboard','leads','clients','proposals','quotations','demos'],
+    'csm'      => ['dashboard','leads','clients','proposals','quotations','demos','outreach'],
 ];
 
 function isLoggedIn(): bool {
@@ -364,4 +364,30 @@ function employmentTypeBadge(string $type): string {
         default     => '<span class="badge badge-soft-primary"><i class="bi bi-person-workspace me-1"></i>Full-Time</span>',
     };
 }
+
+function outreachStatusBadge(string $status): string {
+    return match($status) {
+        'sent'           => '<span class="badge badge-soft-warning"><span class="badge-dot bg-warning"></span>Waiting Reply</span>',
+        'replied'        => '<span class="badge badge-soft-primary"><span class="badge-dot bg-primary"></span>Replied</span>',
+        'bounced'        => '<span class="badge badge-soft-danger"><span class="badge-dot bg-danger"></span>Bounced</span>',
+        'not_interested' => '<span class="badge badge-soft-secondary"><span class="badge-dot bg-secondary"></span>Not Interested</span>',
+        'converted'      => '<span class="badge badge-soft-success"><span class="badge-dot bg-success"></span>Converted to Lead</span>',
+        default          => '<span class="badge badge-soft-secondary"><span class="badge-dot bg-secondary"></span>' . htmlspecialchars($status) . '</span>',
+    };
+}
+
+function outreachResponseBadge(string $responseType): string {
+    return match($responseType) {
+        'meeting_scheduled'    => '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-calendar2-check-fill me-1"></i>Meeting Scheduled</span>',
+        'demo_requested'       => '<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-camera-video-fill me-1"></i>Demo Asked</span>',
+        'interested_more_info' => '<span class="badge bg-info-subtle text-info border border-info-subtle"><i class="bi bi-info-circle-fill me-1"></i>Interested / More Info</span>',
+        'pricing_inquiry'      => '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-tag-fill me-1"></i>Pricing Inquiry</span>',
+        'call_back_later'      => '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"><i class="bi bi-clock-history me-1"></i>Follow-up Later</span>',
+        'referral'             => '<span class="badge bg-dark-subtle text-dark border border-dark-subtle"><i class="bi bi-person-lines-fill me-1"></i>Referral Given</span>',
+        'not_interested'       => '<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-x-circle-fill me-1"></i>Not Interested</span>',
+        'other'                => '<span class="badge bg-light text-dark border"><i class="bi bi-chat-dots me-1"></i>Other Response</span>',
+        default                => '<span class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>Awaiting Reply</span>',
+    };
+}
+
 

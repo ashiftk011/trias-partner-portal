@@ -11,9 +11,10 @@ $navSections = [
     [
         'title' => 'MAIN MENU',
         'items' => [
-            ['module'=>'dashboard', 'icon'=>'speedometer2',     'label'=>'Dashboard',   'url'=>BASE_URL.'/modules/dashboard/index.php'],
-            ['module'=>'leads',     'icon'=>'funnel-fill',      'label'=>'Leads',       'url'=>BASE_URL.'/modules/leads/index.php'],
-            ['module'=>'clients',   'icon'=>'people-fill',      'label'=>'Clients',     'url'=>BASE_URL.'/modules/clients/index.php'],
+            ['module'=>'dashboard', 'icon'=>'speedometer2',     'label'=>'Dashboard',       'url'=>BASE_URL.'/modules/dashboard/index.php'],
+            ['module'=>'leads',     'icon'=>'funnel-fill',      'label'=>'Leads',           'url'=>BASE_URL.'/modules/leads/index.php'],
+            ['module'=>'outreach',  'icon'=>'envelope-at-fill', 'label'=>'Email Outreach',  'url'=>BASE_URL.'/modules/outreach/index.php'],
+            ['module'=>'clients',   'icon'=>'people-fill',      'label'=>'Clients',         'url'=>BASE_URL.'/modules/clients/index.php'],
         ]
     ],
     [

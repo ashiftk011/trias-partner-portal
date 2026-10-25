@@ -73,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Mark lead as converted
-        $db->prepare("UPDATE leads SET status='converted' WHERE id=?")->execute([$id]);
+        // Mark lead as converted and clear pending follow-up
+        $db->prepare("UPDATE leads SET status='converted', next_followup=NULL, updated_at=NOW() WHERE id=?")->execute([$id]);
 
         setFlash('success', "Lead converted to client successfully! Client Code: {$clientCode}");
         redirect(BASE_URL . '/modules/clients/view.php?id=' . $clientId);

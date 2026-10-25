@@ -1551,3 +1551,208 @@ div.dataTables_wrapper .col-sm-12::-webkit-scrollbar-thumb:hover {
   border-top: 1px solid #e2e8f0 !important;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
 }
+
+/* ============================================================
+   Company Expense Mobile Cards & Allocation Pills
+   ============================================================ */
+.expense-mobile-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.expense-mobile-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  border-color: #cbd5e1;
+}
+
+.allocation-pill-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 576px) {
+  .allocation-pill-group {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.allocation-pill-btn {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 0;
+  user-select: none;
+}
+
+.allocation-pill-btn input[type="radio"] {
+  display: none;
+}
+
+.allocation-pill-btn.active,
+.allocation-pill-btn:has(input[type="radio"]:checked) {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.allocation-pill-btn i {
+  font-size: 1.15rem;
+}
+
+.mobile-fab-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+  z-index: 1030;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mobile-fab-btn:active {
+  transform: scale(0.92);
+}
+
+.expense-nav-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.expense-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Dashboard Mobile Utilities & Quick Actions
+   ============================================================ */
+.last-border-0:last-child {
+  border-bottom: 0 !important;
+}
+
+.dashboard-quick-actions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.dashboard-quick-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-quick-action-btn {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.followup-filter-scroll {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.followup-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Cold Outreach Mobile Cards
+   ============================================================ */
+.outreach-mobile-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.outreach-mobile-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  border-color: #cbd5e1;
+}
+
+.outreach-mobile-card.is-meeting {
+  border-left: 4px solid #10b981 !important;
+}
+
+.outreach-mobile-card.is-replied {
+  border-left: 4px solid #06b6d4 !important;
+}
+
+.outreach-mobile-card.is-converted {
+  border-left: 4px solid #6366f1 !important;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.03) 0%, #ffffff 100%);
+}
+
+/* ============================================================
+   Clients Mobile Cards
+   ============================================================ */
+.client-mobile-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.client-mobile-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  border-color: #cbd5e1;
+}
+
+.client-mobile-card.is-active {
+  border-left: 4px solid #10b981 !important;
+}
+
+.client-mobile-card.is-inactive {
+  border-left: 4px solid #94a3b8 !important;
+}
+
+.client-mobile-card.is-suspended {
+  border-left: 4px solid #ef4444 !important;
+}

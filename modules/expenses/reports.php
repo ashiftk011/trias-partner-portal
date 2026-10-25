@@ -92,18 +92,18 @@ include __DIR__ . '/../../includes/header.php';
 <?php displayFlash(); ?>
 
 <!-- Sub Navigation Tabs -->
-<ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-3 shadow-sm border no-print">
-  <li class="nav-item">
+<ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-3 shadow-sm border no-print expense-nav-scroll">
+  <li class="nav-item text-nowrap">
     <a class="nav-link text-dark fw-semibold" href="<?= BASE_URL ?>/modules/expenses/index.php">
       <i class="bi bi-receipt me-1"></i>Expense Register
     </a>
   </li>
-  <li class="nav-item">
+  <li class="nav-item text-nowrap">
     <a class="nav-link active fw-semibold" href="<?= BASE_URL ?>/modules/expenses/reports.php">
       <i class="bi bi-bar-chart-steps me-1"></i>Client &amp; Project Profitability
     </a>
   </li>
-  <li class="nav-item">
+  <li class="nav-item text-nowrap">
     <a class="nav-link text-dark fw-semibold" href="<?= BASE_URL ?>/modules/expenses/assets.php">
       <i class="bi bi-laptop me-1"></i>Company Assets (Separate)
     </a>

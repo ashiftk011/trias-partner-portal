@@ -72,7 +72,7 @@ if ($bulk) {
         $db->beginTransaction();
 
         $updatePlaceholders = implode(',', array_fill(0, count($validIds), '?'));
-        $updateStmt = $db->prepare("UPDATE leads SET status = 'false_lead', trial_end_date = NULL, trial_login_url = NULL, trial_username = NULL, trial_password = NULL, updated_at = NOW() WHERE id IN ($updatePlaceholders)");
+        $updateStmt = $db->prepare("UPDATE leads SET status = 'false_lead', next_followup = NULL, trial_end_date = NULL, trial_login_url = NULL, trial_username = NULL, trial_password = NULL, updated_at = NOW() WHERE id IN ($updatePlaceholders)");
         $updateStmt->execute($validIds);
 
         // Record history response for each lead
@@ -132,7 +132,7 @@ if ($bulk) {
     try {
         $db->beginTransaction();
 
-        $db->prepare("UPDATE leads SET status = 'false_lead', trial_end_date = NULL, trial_login_url = NULL, trial_username = NULL, trial_password = NULL, updated_at = NOW() WHERE id = ?")
+        $db->prepare("UPDATE leads SET status = 'false_lead', next_followup = NULL, trial_end_date = NULL, trial_login_url = NULL, trial_username = NULL, trial_password = NULL, updated_at = NOW() WHERE id = ?")
            ->execute([$id]);
 
         $db->prepare("INSERT INTO lead_responses (lead_id, response_type, response, response_by, status_updated) VALUES (?, 'other', ?, ?, 'false_lead')")

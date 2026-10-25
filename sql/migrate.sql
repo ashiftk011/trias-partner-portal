@@ -773,3 +773,96 @@ CREATE TABLE IF NOT EXISTS company_assets (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- EMAIL OUTREACHES (Cold Email Tracking & Conversion)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS email_outreaches (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    outreach_code VARCHAR(30) UNIQUE NOT NULL,
+    project_id INT NOT NULL,
+    contact_name VARCHAR(150) NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    phone VARCHAR(30) NULL,
+    company VARCHAR(200) NULL,
+    designation VARCHAR(100) NULL,
+    website VARCHAR(255) NULL,
+    linkedin_url VARCHAR(255) NULL,
+    country VARCHAR(100) NULL,
+    city VARCHAR(100) NULL,
+    campaign_name VARCHAR(150) NULL,
+    email_subject VARCHAR(255) NULL,
+    outreach_date DATE NOT NULL,
+    first_sent_at DATETIME NULL,
+    followup_count INT NOT NULL DEFAULT 0,
+    last_followup_date DATE NULL,
+    status ENUM('sent', 'replied', 'bounced', 'not_interested', 'converted') NOT NULL DEFAULT 'sent',
+    response_type ENUM('none', 'meeting_scheduled', 'demo_requested', 'interested_more_info', 'pricing_inquiry', 'call_back_later', 'referral', 'not_interested', 'other') NOT NULL DEFAULT 'none',
+    response_summary TEXT NULL,
+    replied_at DATETIME NULL,
+    meeting_date DATETIME NULL,
+    next_followup_date DATE NULL,
+    converted_lead_id INT NULL,
+    notes TEXT NULL,
+    assigned_to INT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_outreach_project (project_id),
+    INDEX idx_outreach_status (status),
+    INDEX idx_outreach_response (response_type),
+    INDEX idx_outreach_email (email),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (converted_lead_id) REFERENCES leads(id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_outreach_activities (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    outreach_id INT NOT NULL,
+    activity_type ENUM('initial_email', 'follow_up_sent', 'reply_received', 'call', 'meeting_booked', 'demo_booked', 'note', 'converted_to_lead') NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    notes TEXT NULL,
+    scheduled_at DATETIME NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_activity_outreach (outreach_id),
+    FOREIGN KEY (outreach_id) REFERENCES email_outreaches(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS outreach_id INT NULL DEFAULT NULL AFTER meta_lead_id;
+
+-- ============================================================
+-- LEAD CALL RECORDINGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS lead_call_recordings (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    lead_id INT NOT NULL,
+    response_id INT NULL,
+    title VARCHAR(200) NOT NULL,
+    call_date DATETIME NOT NULL,
+    duration_seconds INT NULL DEFAULT 0,
+    call_type ENUM('outbound', 'inbound') NOT NULL DEFAULT 'outbound',
+    call_status ENUM('connected', 'no_answer', 'busy', 'voicemail', 'wrong_number') NOT NULL DEFAULT 'connected',
+    file_path VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    file_size INT NULL,
+    external_url VARCHAR(500) NULL,
+    notes TEXT NULL,
+    recorded_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_recordings_lead (lead_id),
+    INDEX idx_recordings_date (call_date),
+    FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (response_id) REFERENCES lead_responses(id) ON DELETE SET NULL,
+    FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- LEADS NEXT FOLLOW-UP COLUMN & INDEX
+-- ============================================================
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_followup DATE NULL AFTER trial_password;
+CREATE INDEX IF NOT EXISTS idx_leads_next_followup ON leads(next_followup);
+

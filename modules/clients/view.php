@@ -107,17 +107,24 @@ $pageTitle = 'Client: ' . $client['name'];
 include __DIR__ . '/../../includes/header.php';
 ?>
 
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="<?= BASE_URL ?>/modules/clients/index.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <div class="flex-grow-1">
-    <h4 class="mb-0"><?= htmlspecialchars($client['name']) ?> <small class="text-muted fs-6"><?= htmlspecialchars($client['client_code'] ?? '') ?></small></h4>
-    <p class="text-muted small mb-0"><?= htmlspecialchars($client['company'] ?? '') ?></p>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div class="d-flex align-items-center gap-3">
+    <a href="<?= BASE_URL ?>/modules/clients/index.php" class="btn btn-sm btn-outline-secondary rounded-circle" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h4 class="mb-0 fw-bold"><?= htmlspecialchars($client['name']) ?></h4>
+        <span class="badge bg-light text-muted border font-monospace"><?= htmlspecialchars($client['client_code'] ?? '') ?></span>
+      </div>
+      <?php if (!empty($client['company'])): ?>
+        <p class="text-muted small mb-0"><i class="bi bi-building me-1"></i><?= htmlspecialchars($client['company']) ?></p>
+      <?php endif; ?>
+    </div>
   </div>
-  <div class="d-flex gap-2 align-items-center">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
     <?= statusBadge($client['status']) ?>
     <div class="dropdown">
-      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Actions</button>
-      <ul class="dropdown-menu dropdown-menu-end">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill px-3" data-bs-toggle="dropdown">Actions</button>
+      <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3">
         <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/clients/settings.php?id=<?= $id ?>"><i class="bi bi-gear me-2"></i>Manage Settings & Instances</a></li>
         <li><a class="dropdown-item" href="<?= BASE_URL ?>/modules/renewals/index.php?client_id=<?= $id ?>"><i class="bi bi-arrow-repeat me-2"></i>Renewals</a></li>
         <?php if (hasAccess('invoices')): ?>

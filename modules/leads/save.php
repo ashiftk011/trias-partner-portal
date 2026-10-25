@@ -43,7 +43,8 @@ if ($id > 0) {
             redirect(BASE_URL . '/modules/leads/index.php');
         }
     }
-    $db->prepare("UPDATE leads SET project_id=?,region_id=?,name=?,email=?,phone=?,company=?,designation=?,website=?,address=?,source=?,status=?,assigned_to=?,interested_plan_id=?,trial_end_date=?,trial_login_url=?,trial_username=?,trial_password=?,notes=?,updated_at=NOW() WHERE id=?")
+    $clearFu = in_array($status, ['converted', 'false_lead', 'not_interested']) ? ",next_followup=NULL" : "";
+    $db->prepare("UPDATE leads SET project_id=?,region_id=?,name=?,email=?,phone=?,company=?,designation=?,website=?,address=?,source=?,status=?,assigned_to=?,interested_plan_id=?,trial_end_date=?,trial_login_url=?,trial_username=?,trial_password=?,notes=? $clearFu,updated_at=NOW() WHERE id=?")
        ->execute([$projectId,$regionId,$name,$email,$phone,$company,$designation,$website,$address,$source,$status,$assignedTo,$planId,$trialEndDate,$trialLoginUrl,$trialUsername,$trialPassword,$notes,$id]);
     setFlash('success', 'Lead updated successfully.');
 } else {

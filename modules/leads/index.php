@@ -453,6 +453,11 @@ if ($filterAssigned !== '') $activeFilterCount++;
                   </span>
                 <?php endif; ?>
                 <?= statusBadge($l['status']) ?>
+                <?php if (!empty($l['next_followup'])): ?>
+                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning" title="Scheduled Follow-up">
+                    <i class="bi bi-clock-history me-1"></i><?= date('d M', strtotime($l['next_followup'])) ?>
+                  </span>
+                <?php endif; ?>
               </div>
             </div>
             <div>
@@ -471,6 +476,10 @@ if ($filterAssigned !== '') $activeFilterCount++;
               <?php if ($isAdLead): ?>
                 <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff;">
                   <i class="bi bi-instagram me-1"></i>Instagram
+                </span>
+              <?php elseif (!empty($l['outreach_id'])): ?>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                  <i class="bi bi-envelope-at-fill me-1"></i>Cold Email
                 </span>
               <?php else: ?>
                 <span class="badge bg-light text-dark border"><?= ucfirst(str_replace('_',' ',$l['source'])) ?></span>
@@ -572,11 +581,24 @@ if ($filterAssigned !== '') $activeFilterCount++;
                   <span class="badge shadow-sm" style="background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff;">
                     <i class="bi bi-instagram me-1"></i>Instagram
                   </span>
+                <?php elseif (!empty($l['outreach_id'])): ?>
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                    <i class="bi bi-envelope-at-fill me-1"></i>Cold Email
+                  </span>
                 <?php else: ?>
                   <span class="badge bg-light text-dark border"><?= ucfirst(str_replace('_',' ',$l['source'])) ?></span>
                 <?php endif; ?>
               </td>
-              <td><?= statusBadge($l['status']) ?></td>
+              <td>
+                <?= statusBadge($l['status']) ?>
+                <?php if (!empty($l['next_followup'])): ?>
+                  <div class="mt-1">
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning text-nowrap" title="Scheduled Follow-up" style="font-size: 0.72rem;">
+                      <i class="bi bi-clock-history me-1"></i><?= date('d M Y', strtotime($l['next_followup'])) ?>
+                    </span>
+                  </div>
+                <?php endif; ?>
+              </td>
               <td class="small"><?= htmlspecialchars($l['assigned_name'] ?? '-') ?></td>
               <td class="text-muted small text-nowrap"><?= date('d M Y', strtotime($l['created_at'])) ?></td>
               <td>

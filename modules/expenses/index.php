@@ -248,300 +248,476 @@ include __DIR__ . '/../../includes/header.php';
 ?>
 
 <!-- Header & Nav Tabs -->
-<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-3 mb-md-4 gap-2">
   <div>
-    <h4 class="mb-0"><i class="bi bi-credit-card-2-front me-2 text-primary"></i>Company Expense Management</h4>
-    <p class="text-muted small mb-0">Record and monitor client-wise, project-wise, and general overhead expenditures with equal split allocation</p>
+    <h4 class="mb-0 fs-4 fw-bold"><i class="bi bi-credit-card-2-front me-2 text-primary"></i>Company Expenses</h4>
+    <p class="text-muted small mb-0 d-none d-sm-block">Record and monitor client-wise, project-wise, and general overhead expenditures with equal split allocation</p>
   </div>
-  <div class="d-flex flex-wrap gap-2">
-    <a href="<?= BASE_URL ?>/modules/expenses/reports.php" class="btn btn-outline-info">
-      <i class="bi bi-graph-up-arrow me-1"></i>Client &amp; Project P&amp;L
-    </a>
-    <a href="<?= BASE_URL ?>/modules/expenses/assets.php" class="btn btn-outline-secondary">
-      <i class="bi bi-box-seam me-1"></i>Company Assets
-    </a>
-    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal">
-      <i class="bi bi-tags me-1"></i>Categories
-    </button>
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addExpenseModal" onclick="resetExpenseModal()">
-      <i class="bi bi-plus-circle me-1"></i>Record Expense
-    </button>
+  <div class="d-flex flex-wrap gap-2 w-100 w-sm-auto justify-content-between justify-content-sm-end align-items-center">
+    <!-- View Switcher (Cards vs Table) -->
+    <div class="btn-group btn-group-sm border rounded-3 p-1 bg-white shadow-sm" id="expensesViewToggleGroup">
+      <button type="button" class="btn btn-sm btn-white border-0 fw-semibold active" id="btnViewCards" onclick="setExpensesView('cards')">
+        <i class="bi bi-grid-fill me-1"></i>Cards
+      </button>
+      <button type="button" class="btn btn-sm btn-light border-0 fw-semibold text-muted" id="btnViewTable" onclick="setExpensesView('table')">
+        <i class="bi bi-table me-1"></i>Table
+      </button>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal" title="Manage Categories">
+        <i class="bi bi-tags me-1"></i><span class="d-none d-md-inline">Categories</span>
+      </button>
+      <a href="<?= BASE_URL ?>/modules/expenses/reports.php" class="btn btn-outline-info btn-sm" title="Client & Project P&L">
+        <i class="bi bi-graph-up-arrow me-1"></i><span class="d-none d-md-inline">P&amp;L</span>
+      </a>
+      <a href="<?= BASE_URL ?>/modules/expenses/assets.php" class="btn btn-outline-secondary btn-sm" title="Company Assets">
+        <i class="bi bi-box-seam me-1"></i><span class="d-none d-md-inline">Assets</span>
+      </a>
+      <button type="button" class="btn btn-primary btn-sm fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addExpenseModal" onclick="resetExpenseModal()">
+        <i class="bi bi-plus-circle me-1"></i><span class="d-none d-sm-inline">Record </span>Expense
+      </button>
+    </div>
   </div>
 </div>
 
 <?php displayFlash(); ?>
 
-<!-- Sub Navigation Tabs -->
-<ul class="nav nav-pills mb-4 gap-2 bg-white p-2 rounded-3 shadow-sm border">
-  <li class="nav-item">
-    <a class="nav-link active fw-semibold" href="<?= BASE_URL ?>/modules/expenses/index.php">
+<!-- Sub Navigation Tabs (Scrollable on mobile) -->
+<ul class="nav nav-pills mb-3 mb-md-4 gap-2 bg-white p-2 rounded-3 shadow-sm border expense-nav-scroll">
+  <li class="nav-item text-nowrap">
+    <a class="nav-link active fw-semibold py-1 px-3" href="<?= BASE_URL ?>/modules/expenses/index.php">
       <i class="bi bi-receipt me-1"></i>Expense Register
     </a>
   </li>
-  <li class="nav-item">
-    <a class="nav-link text-dark fw-semibold" href="<?= BASE_URL ?>/modules/expenses/reports.php">
-      <i class="bi bi-bar-chart-steps me-1"></i>Client &amp; Project Profitability
+  <li class="nav-item text-nowrap">
+    <a class="nav-link text-dark fw-semibold py-1 px-3" href="<?= BASE_URL ?>/modules/expenses/reports.php">
+      <i class="bi bi-bar-chart-steps me-1"></i>Profitability (P&amp;L)
     </a>
   </li>
-  <li class="nav-item">
-    <a class="nav-link text-dark fw-semibold" href="<?= BASE_URL ?>/modules/expenses/assets.php">
-      <i class="bi bi-laptop me-1"></i>Company Assets (Separate)
+  <li class="nav-item text-nowrap">
+    <a class="nav-link text-dark fw-semibold py-1 px-3" href="<?= BASE_URL ?>/modules/expenses/assets.php">
+      <i class="bi bi-laptop me-1"></i>Company Assets
     </a>
   </li>
 </ul>
 
-<!-- Stat Summary Cards -->
-<div class="row g-3 mb-4">
-  <div class="col-sm-6 col-xl-3">
+<!-- Stat Summary Cards (Responsive 2x2 Grid on Mobile, 4-col on Desktop) -->
+<div class="row g-2 g-md-3 mb-3 mb-md-4">
+  <div class="col-6 col-xl-3">
     <div class="card border-0 shadow-sm stat-card h-100">
-      <div class="card-body d-flex align-items-center gap-3 py-3">
-        <div class="stat-icon rounded-3 bg-danger bg-opacity-10 text-danger p-3">
-          <i class="bi bi-wallet2 fs-3"></i>
+      <div class="card-body d-flex align-items-center gap-2 gap-sm-3 p-3">
+        <div class="stat-icon rounded-3 bg-danger bg-opacity-10 text-danger p-2 p-sm-3 flex-shrink-0">
+          <i class="bi bi-wallet2 fs-4 fs-sm-3"></i>
         </div>
-        <div>
-          <div class="fs-4 fw-bold text-danger">₹<?= number_format($totalExpenseAmount, 2) ?></div>
-          <div class="text-muted small">Total Filtered Spend (<?= number_format($totalCount) ?> entries)</div>
+        <div class="min-w-0">
+          <div class="fs-5 fs-sm-4 fw-bold text-danger text-truncate">₹<?= number_format($totalExpenseAmount, 2) ?></div>
+          <div class="text-muted small text-truncate" style="font-size: 0.72rem;">Total Spend (<?= number_format($totalCount) ?>)</div>
         </div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     <div class="card border-0 shadow-sm stat-card h-100">
-      <div class="card-body d-flex align-items-center gap-3 py-3">
-        <div class="stat-icon rounded-3 bg-info bg-opacity-10 text-info p-3">
-          <i class="bi bi-person-check fs-3"></i>
+      <div class="card-body d-flex align-items-center gap-2 gap-sm-3 p-3">
+        <div class="stat-icon rounded-3 bg-info bg-opacity-10 text-info p-2 p-sm-3 flex-shrink-0">
+          <i class="bi bi-person-check fs-4 fs-sm-3"></i>
         </div>
-        <div>
-          <div class="fs-4 fw-bold text-info">₹<?= number_format($totalClientAllocated, 2) ?></div>
-          <div class="text-muted small">Client-Specific Cost (Servers, APIs)</div>
+        <div class="min-w-0">
+          <div class="fs-5 fs-sm-4 fw-bold text-info text-truncate">₹<?= number_format($totalClientAllocated, 2) ?></div>
+          <div class="text-muted small text-truncate" style="font-size: 0.72rem;">Client Costs (Servers)</div>
         </div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     <div class="card border-0 shadow-sm stat-card h-100">
-      <div class="card-body d-flex align-items-center gap-3 py-3">
-        <div class="stat-icon rounded-3 bg-primary bg-opacity-10 text-primary p-3">
-          <i class="bi bi-folder2-open fs-3"></i>
+      <div class="card-body d-flex align-items-center gap-2 gap-sm-3 p-3">
+        <div class="stat-icon rounded-3 bg-primary bg-opacity-10 text-primary p-2 p-sm-3 flex-shrink-0">
+          <i class="bi bi-folder2-open fs-4 fs-sm-3"></i>
         </div>
-        <div>
-          <div class="fs-4 fw-bold text-primary">₹<?= number_format($totalProjectAllocated, 2) ?></div>
-          <div class="text-muted small">Project-Specific Costs</div>
+        <div class="min-w-0">
+          <div class="fs-5 fs-sm-4 fw-bold text-primary text-truncate">₹<?= number_format($totalProjectAllocated, 2) ?></div>
+          <div class="text-muted small text-truncate" style="font-size: 0.72rem;">Project Specific</div>
         </div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-xl-3">
+  <div class="col-6 col-xl-3">
     <div class="card border-0 shadow-sm stat-card h-100">
-      <div class="card-body d-flex align-items-center gap-3 py-3">
-        <div class="stat-icon rounded-3 bg-secondary bg-opacity-10 text-secondary p-3">
-          <i class="bi bi-building fs-3"></i>
+      <div class="card-body d-flex align-items-center gap-2 gap-sm-3 p-3">
+        <div class="stat-icon rounded-3 bg-secondary bg-opacity-10 text-secondary p-2 p-sm-3 flex-shrink-0">
+          <i class="bi bi-building fs-4 fs-sm-3"></i>
         </div>
-        <div>
-          <div class="fs-4 fw-bold text-secondary">₹<?= number_format($totalGeneralOverhead, 2) ?></div>
-          <div class="text-muted small">General Overhead &amp; Utilities</div>
+        <div class="min-w-0">
+          <div class="fs-5 fs-sm-4 fw-bold text-secondary text-truncate">₹<?= number_format($totalGeneralOverhead, 2) ?></div>
+          <div class="text-muted small text-truncate" style="font-size: 0.72rem;">General Overhead</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<?php
+$activeFilterCount = ($filterCategory ? 1 : 0) + ($filterAllocation ? 1 : 0) + ($filterClient ? 1 : 0) + ($filterProject ? 1 : 0) + ($filterFrom ? 1 : 0) + ($filterTo ? 1 : 0) + ($filterMode ? 1 : 0) + ($search ? 1 : 0);
+?>
 <!-- Filter Bar -->
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-body py-3">
-    <form method="GET" class="row g-2 align-items-end">
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">Allocation Scope</label>
-        <select name="allocation_type" class="form-select form-select-sm">
-          <option value="">All Scopes</option>
-          <option value="general" <?= $filterAllocation==='general'?'selected':'' ?>>General Overhead</option>
-          <option value="client" <?= $filterAllocation==='client'?'selected':'' ?>>Client Specific</option>
-          <option value="project" <?= $filterAllocation==='project'?'selected':'' ?>>Project Specific</option>
-        </select>
+<div class="card border-0 shadow-sm mb-3 mb-md-4">
+  <div class="card-body p-3">
+    <!-- Mobile Filter Header Toggle -->
+    <div class="d-flex d-md-none justify-content-between align-items-center <?= $activeFilterCount > 0 ? 'mb-2' : '' ?>">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-bold text-dark small"><i class="bi bi-funnel text-primary me-1"></i>Search &amp; Filters</span>
+        <?php if ($activeFilterCount > 0): ?>
+          <span class="badge bg-primary rounded-pill"><?= $activeFilterCount ?> active</span>
+        <?php endif; ?>
       </div>
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">Filter Client</label>
-        <select name="client_id" class="form-select form-select-sm">
-          <option value="0">All Clients</option>
-          <?php foreach ($allClients as $cl): ?>
-            <option value="<?= $cl['id'] ?>" <?= $filterClient===$cl['id']?'selected':'' ?>>
-              <?= htmlspecialchars($cl['name']) ?><?= $cl['company'] ? ' (' . htmlspecialchars($cl['company']) . ')' : '' ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
+      <div class="d-flex align-items-center gap-2">
+        <?php if ($activeFilterCount > 0): ?>
+          <a href="<?= BASE_URL ?>/modules/expenses/index.php?clear=1" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.75rem;">
+            Clear All
+          </a>
+        <?php endif; ?>
+        <button class="btn btn-sm btn-light border py-1 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#expenseFiltersCollapse" aria-expanded="<?= $activeFilterCount > 0 ? 'true' : 'false' ?>">
+          <i class="bi bi-sliders me-1"></i><span><?= $activeFilterCount > 0 ? 'Hide' : 'Filter' ?></span>
+        </button>
       </div>
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">Filter Project</label>
-        <select name="project_id" class="form-select form-select-sm">
-          <option value="0">All Projects</option>
-          <?php foreach ($allProjects as $pr): ?>
-            <option value="<?= $pr['id'] ?>" <?= $filterProject===$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">Category</label>
-        <select name="category_id" class="form-select form-select-sm">
-          <option value="0">All Categories</option>
-          <?php foreach ($categories as $cat): ?>
-            <option value="<?= $cat['id'] ?>" <?= $filterCategory===$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">From Date</label>
-        <input type="date" name="from_date" class="form-control form-control-sm" value="<?= htmlspecialchars($filterFrom) ?>">
-      </div>
-      <div class="col-md-2 col-6">
-        <label class="form-label small text-muted mb-1">To Date</label>
-        <input type="date" name="to_date" class="form-control form-control-sm" value="<?= htmlspecialchars($filterTo) ?>">
-      </div>
-      <div class="col-md-3 col-6">
-        <label class="form-label small text-muted mb-1">Payment Mode</label>
-        <select name="payment_mode" class="form-select form-select-sm">
-          <option value="">All Modes</option>
-          <?php foreach (['bank_transfer'=>'Bank Transfer','cash'=>'Cash','upi'=>'UPI','cheque'=>'Cheque','card'=>'Card','other'=>'Other'] as $v => $l): ?>
-            <option value="<?= $v ?>" <?= $filterMode===$v?'selected':'' ?>><?= $l ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-md-9 col-12">
-        <label class="form-label small text-muted mb-1">Search Keywords</label>
-        <div class="input-group input-group-sm">
-          <input type="text" name="q" class="form-control" placeholder="Search title, vendor, ref no..." value="<?= htmlspecialchars($search) ?>">
-          <button type="submit" class="btn btn-primary px-3"><i class="bi bi-search me-1"></i>Filter</button>
-          <?php if ($filterCategory || $filterAllocation || $filterClient || $filterProject || $filterFrom || $filterTo || $filterMode || $search): ?>
-            <a href="<?= BASE_URL ?>/modules/expenses/index.php?clear=1" class="btn btn-outline-secondary" title="Reset Filters"><i class="bi bi-x-circle me-1"></i>Clear</a>
-          <?php endif; ?>
+    </div>
+
+    <!-- Collapsible filter on mobile, open on desktop -->
+    <div class="collapse d-md-block <?= $activeFilterCount > 0 ? 'show' : '' ?>" id="expenseFiltersCollapse">
+      <form method="GET" class="row g-2 align-items-end">
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">Allocation Scope</label>
+          <select name="allocation_type" class="form-select form-select-sm">
+            <option value="">All Scopes</option>
+            <option value="general" <?= $filterAllocation==='general'?'selected':'' ?>>General Overhead</option>
+            <option value="client" <?= $filterAllocation==='client'?'selected':'' ?>>Client Specific</option>
+            <option value="project" <?= $filterAllocation==='project'?'selected':'' ?>>Project Specific</option>
+          </select>
         </div>
-      </div>
-    </form>
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">Filter Client</label>
+          <select name="client_id" class="form-select form-select-sm">
+            <option value="0">All Clients</option>
+            <?php foreach ($allClients as $cl): ?>
+              <option value="<?= $cl['id'] ?>" <?= $filterClient===$cl['id']?'selected':'' ?>>
+                <?= htmlspecialchars($cl['name']) ?><?= $cl['company'] ? ' (' . htmlspecialchars($cl['company']) . ')' : '' ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">Filter Project</label>
+          <select name="project_id" class="form-select form-select-sm">
+            <option value="0">All Projects</option>
+            <?php foreach ($allProjects as $pr): ?>
+              <option value="<?= $pr['id'] ?>" <?= $filterProject===$pr['id']?'selected':'' ?>><?= htmlspecialchars($pr['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">Category</label>
+          <select name="category_id" class="form-select form-select-sm">
+            <option value="0">All Categories</option>
+            <?php foreach ($categories as $cat): ?>
+              <option value="<?= $cat['id'] ?>" <?= $filterCategory===$cat['id']?'selected':'' ?>><?= htmlspecialchars($cat['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">From Date</label>
+          <input type="date" name="from_date" class="form-control form-control-sm" value="<?= htmlspecialchars($filterFrom) ?>">
+        </div>
+        <div class="col-md-2 col-6">
+          <label class="form-label small text-muted mb-1">To Date</label>
+          <input type="date" name="to_date" class="form-control form-control-sm" value="<?= htmlspecialchars($filterTo) ?>">
+        </div>
+        <div class="col-md-3 col-6">
+          <label class="form-label small text-muted mb-1">Payment Mode</label>
+          <select name="payment_mode" class="form-select form-select-sm">
+            <option value="">All Modes</option>
+            <?php foreach (['bank_transfer'=>'Bank Transfer','cash'=>'Cash','upi'=>'UPI','cheque'=>'Cheque','card'=>'Card','other'=>'Other'] as $v => $l): ?>
+              <option value="<?= $v ?>" <?= $filterMode===$v?'selected':'' ?>><?= $l ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-9 col-12">
+          <label class="form-label small text-muted mb-1">Search Keywords</label>
+          <div class="input-group input-group-sm">
+            <input type="text" name="q" class="form-control" placeholder="Search title, vendor, ref no..." value="<?= htmlspecialchars($search) ?>">
+            <button type="submit" class="btn btn-primary px-3"><i class="bi bi-search me-1"></i>Filter</button>
+            <?php if ($activeFilterCount > 0): ?>
+              <a href="<?= BASE_URL ?>/modules/expenses/index.php?clear=1" class="btn btn-outline-secondary" title="Reset Filters"><i class="bi bi-x-circle me-1"></i>Clear</a>
+            <?php endif; ?>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
-<!-- Expenses Table -->
-<div class="card border-0 shadow-sm">
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0 datatable align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>#</th>
-            <th>Date</th>
-            <th>Expense Item / Purpose</th>
-            <th>Category</th>
-            <th>Allocation &amp; Split</th>
-            <th class="text-end">Total Amount</th>
-            <th>Paid Via / Account</th>
-            <th>Ref #</th>
-            <th>Receipt</th>
-            <th class="text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if (empty($expenses)): ?>
-            <tr>
-              <td colspan="10" class="text-center text-muted py-4">No expense records found.</td>
-            </tr>
-          <?php else: ?>
-            <?php foreach ($expenses as $idx => $ex): 
-              $alloc = $allocationsMap[$ex['id']] ?? ['clients'=>[],'projects'=>[],'summary'=>'General / Overhead'];
-              $hasCl = !empty($alloc['clients']);
-              $hasPr = !empty($alloc['projects']);
-            ?>
-              <tr>
-                <td><?= $idx + 1 ?></td>
-                <td class="fw-semibold text-nowrap"><?= date('d M Y', strtotime($ex['expense_date'])) ?></td>
-                <td>
-                  <div class="fw-bold text-dark"><?= htmlspecialchars($ex['title']) ?></div>
-                  <?php if (!empty($ex['vendor_name'])): ?>
-                    <small class="text-muted d-block"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($ex['vendor_name']) ?></small>
-                  <?php endif; ?>
-                  <?php if (!empty($ex['description'])): ?>
-                    <small class="text-muted text-truncate d-block" style="max-width:240px;"><?= htmlspecialchars($ex['description']) ?></small>
-                  <?php endif; ?>
-                </td>
-                <td>
-                  <span class="badge border" style="background-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>15; color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>; border-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>40 !important;">
-                    <?= htmlspecialchars($ex['category_name']) ?>
+<!-- Mobile Cards View Container (Shown by default on mobile / when Cards selected) -->
+<div id="expensesCardsContainer">
+  <?php if (empty($expenses)): ?>
+    <div class="card border-0 shadow-sm p-4 text-center">
+      <div class="avatar avatar-lg bg-light text-muted rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 56px; height: 56px;">
+        <i class="bi bi-receipt fs-2 text-secondary"></i>
+      </div>
+      <h6 class="fw-semibold text-dark mb-1">No Expense Records Found</h6>
+      <p class="text-muted small mb-3">No expenses match your search or filter criteria.</p>
+      <button type="button" class="btn btn-primary btn-sm mx-auto" data-bs-toggle="modal" data-bs-target="#addExpenseModal" onclick="resetExpenseModal()">
+        <i class="bi bi-plus-circle me-1"></i>Record New Expense
+      </button>
+    </div>
+  <?php else: ?>
+    <div class="row g-3">
+      <?php foreach ($expenses as $idx => $ex): 
+        $alloc = $allocationsMap[$ex['id']] ?? ['clients'=>[],'projects'=>[],'summary'=>'General / Overhead'];
+        $hasCl = !empty($alloc['clients']);
+        $hasPr = !empty($alloc['projects']);
+      ?>
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="expense-mobile-card h-100 d-flex flex-column justify-content-between">
+          <div>
+            <!-- Top Row: Date, Category Badge, Mode -->
+            <div class="d-flex align-items-center justify-content-between gap-1 mb-2">
+              <span class="badge border text-truncate" style="max-width: 170px; background-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>18; color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>; border-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>40 !important;">
+                <?= htmlspecialchars($ex['category_name']) ?>
+              </span>
+              <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-light text-dark border small" style="font-size: 0.72rem;">
+                  <?= strtoupper(str_replace('_',' ',$ex['payment_mode'])) ?>
+                </span>
+                <span class="text-muted small fw-medium text-nowrap ms-1" style="font-size: 0.78rem;">
+                  <?= date('d M Y', strtotime($ex['expense_date'])) ?>
+                </span>
+              </div>
+            </div>
+
+            <!-- Title & Vendor -->
+            <div class="mb-2">
+              <h6 class="fw-bold text-dark mb-1 lh-sm"><?= htmlspecialchars($ex['title']) ?></h6>
+              <?php if (!empty($ex['vendor_name'])): ?>
+                <div class="text-muted small">
+                  <i class="bi bi-shop me-1 text-primary"></i><?= htmlspecialchars($ex['vendor_name']) ?>
+                </div>
+              <?php endif; ?>
+              <?php if (!empty($ex['description'])): ?>
+                <div class="text-muted small mt-1 bg-light p-2 rounded-2 border" style="font-size: 0.8rem;">
+                  <?= nl2br(htmlspecialchars($ex['description'])) ?>
+                </div>
+              <?php endif; ?>
+            </div>
+
+            <!-- Amount & Account Box -->
+            <div class="d-flex align-items-center justify-content-between bg-danger bg-opacity-10 p-2 px-3 rounded-3 mb-2 border border-danger border-opacity-25">
+              <div>
+                <span class="text-muted small fw-semibold" style="font-size: 0.68rem; letter-spacing: 0.03em;">AMOUNT</span>
+                <div class="fw-bold text-danger fs-5">₹<?= number_format($ex['amount'], 2) ?></div>
+              </div>
+              <div class="text-end">
+                <?php if (!empty($ex['account_name'])): ?>
+                  <div class="small text-dark fw-semibold text-truncate" style="max-width: 140px; font-size: 0.78rem;">
+                    <i class="bi bi-bank me-1 text-primary"></i><?= htmlspecialchars($ex['account_name']) ?>
+                  </div>
+                <?php endif; ?>
+                <?php if (!empty($ex['reference_no'])): ?>
+                  <div class="small text-muted font-monospace mt-1" style="font-size: 0.72rem;">
+                    Ref: <?= htmlspecialchars($ex['reference_no']) ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+
+            <!-- Allocation Split Section -->
+            <div class="mb-3">
+              <?php if ($hasCl && $hasPr): ?>
+                <div class="d-flex flex-column gap-1">
+                  <span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-50 text-wrap text-start">
+                    <i class="bi bi-people-fill me-1"></i><?= count($alloc['clients']) ?> Clients: ₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> ea
                   </span>
-                </td>
-                <td>
-                  <?php if ($hasCl && $hasPr): ?>
-                    <div class="d-flex flex-column gap-1">
-                      <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" title="<?= htmlspecialchars($alloc['summary']) ?>">
-                        <i class="bi bi-people-fill me-1"></i><?= count($alloc['clients']) ?> Clients (₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> ea)
-                      </span>
-                      <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
-                        <i class="bi bi-folder-fill me-1"></i><?= count($alloc['projects']) ?> Projects (₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> ea)
-                      </span>
-                    </div>
-                  <?php elseif ($hasCl): ?>
-                    <div>
-                      <span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-50" title="Split equally across selected clients">
-                        <i class="bi bi-person-badge-fill me-1"></i><?= count($alloc['clients']) ?> Client<?= count($alloc['clients']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> each
-                      </span>
-                      <div class="small text-muted text-truncate mt-1" style="max-width: 220px;" title="<?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], $alloc['clients']))) ?>">
-                        <?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], array_slice($alloc['clients'], 0, 2)))) ?><?= count($alloc['clients']) > 2 ? ' +' . (count($alloc['clients']) - 2) . ' more' : '' ?>
-                      </div>
-                    </div>
-                  <?php elseif ($hasPr): ?>
-                    <div>
-                      <span class="badge bg-primary bg-opacity-15 text-primary-emphasis border border-primary border-opacity-50" title="Split equally across selected projects">
-                        <i class="bi bi-folder2 me-1"></i><?= count($alloc['projects']) ?> Project<?= count($alloc['projects']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> each
-                      </span>
-                      <div class="small text-muted text-truncate mt-1" style="max-width: 220px;" title="<?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>">
-                        <?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>
-                      </div>
-                    </div>
-                  <?php else: ?>
-                    <span class="badge bg-light text-secondary border">
-                      <i class="bi bi-building me-1"></i>General Overhead
-                    </span>
-                  <?php endif; ?>
-                </td>
-                <td class="fw-bold text-danger text-end fs-6">₹<?= number_format($ex['amount'], 2) ?></td>
-                <td>
-                  <span class="badge bg-light text-dark border"><?= strtoupper(str_replace('_',' ',$ex['payment_mode'])) ?></span>
-                  <?php if (!empty($ex['account_name'])): ?>
-                    <div class="small text-muted text-truncate mt-1" style="max-width:140px;">
-                      <i class="bi bi-bank me-1"></i><?= htmlspecialchars($ex['account_name']) ?>
-                    </div>
-                  <?php endif; ?>
-                </td>
-                <td><code class="text-dark"><?= htmlspecialchars($ex['reference_no'] ?: '-') ?></code></td>
-                <td>
-                  <?php if (!empty($ex['receipt_file'])): ?>
-                    <a href="<?= BASE_URL . '/' . htmlspecialchars($ex['receipt_file']) ?>" target="_blank" class="btn btn-sm btn-outline-info p-1 py-0" title="View Uploaded Receipt">
-                      <i class="bi bi-paperclip me-1"></i>Receipt
-                    </a>
-                  <?php else: ?>
-                    <span class="text-muted small">-</span>
-                  <?php endif; ?>
-                </td>
-                <td class="text-center text-nowrap">
-                  <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Edit Expense" onclick='openEditExpenseModal(<?= json_encode($ex, JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($alloc, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <form method="POST" class="d-inline" onsubmit="return confirm('Delete expense record: <?= htmlspecialchars($ex['title']) ?>?');">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="action" value="delete_expense">
-                    <input type="hidden" name="expense_id" value="<?= $ex['id'] ?>">
-                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Expense"><i class="bi bi-trash"></i></button>
-                  </form>
-                </td>
+                  <span class="badge bg-primary bg-opacity-15 text-primary-emphasis border border-primary border-opacity-50 text-wrap text-start">
+                    <i class="bi bi-folder-fill me-1"></i><?= count($alloc['projects']) ?> Projects: ₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> ea
+                  </span>
+                </div>
+              <?php elseif ($hasCl): ?>
+                <div>
+                  <span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-50 text-wrap text-start">
+                    <i class="bi bi-person-badge-fill me-1"></i><?= count($alloc['clients']) ?> Client<?= count($alloc['clients']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> ea
+                  </span>
+                  <div class="small text-muted mt-1 text-truncate" title="<?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], $alloc['clients']))) ?>">
+                    <i class="bi bi-arrow-return-right me-1 text-info"></i><?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], $alloc['clients']))) ?>
+                  </div>
+                </div>
+              <?php elseif ($hasPr): ?>
+                <div>
+                  <span class="badge bg-primary bg-opacity-15 text-primary-emphasis border border-primary border-opacity-50 text-wrap text-start">
+                    <i class="bi bi-folder2 me-1"></i><?= count($alloc['projects']) ?> Project<?= count($alloc['projects']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> ea
+                  </span>
+                  <div class="small text-muted mt-1 text-truncate" title="<?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>">
+                    <i class="bi bi-arrow-return-right me-1 text-primary"></i><?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>
+                  </div>
+                </div>
+              <?php else: ?>
+                <span class="badge bg-light text-secondary border">
+                  <i class="bi bi-building me-1"></i>General Overhead
+                </span>
+              <?php endif; ?>
+            </div>
+          </div>
+
+          <!-- Bottom Actions -->
+          <div class="d-flex align-items-center gap-2 pt-2 border-top">
+            <?php if (!empty($ex['receipt_file'])): ?>
+              <a href="<?= BASE_URL . '/' . htmlspecialchars($ex['receipt_file']) ?>" target="_blank" class="btn btn-outline-info btn-sm flex-grow-1" title="View Uploaded Receipt">
+                <i class="bi bi-paperclip me-1"></i>Receipt
+              </a>
+            <?php endif; ?>
+            <button type="button" class="btn btn-outline-primary btn-sm <?= empty($ex['receipt_file']) ? 'flex-grow-1' : '' ?>" title="Edit Expense" onclick='openEditExpenseModal(<?= json_encode($ex, JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($alloc, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+              <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+            <form method="POST" class="d-inline" onsubmit="return confirm('Delete expense record: <?= htmlspecialchars($ex['title'], ENT_QUOTES) ?>?');">
+              <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+              <input type="hidden" name="action" value="delete_expense">
+              <input type="hidden" name="expense_id" value="<?= $ex['id'] ?>">
+              <button type="submit" class="btn btn-outline-danger btn-sm px-3" title="Delete Expense">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<!-- Desktop/Full Table View Container -->
+<div id="expensesTableContainer" class="d-none">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 datatable align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Expense Item / Purpose</th>
+              <th>Category</th>
+              <th>Allocation &amp; Split</th>
+              <th class="text-end">Total Amount</th>
+              <th>Paid Via / Account</th>
+              <th>Ref #</th>
+              <th>Receipt</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($expenses)): ?>
+              <tr>
+                <td colspan="10" class="text-center text-muted py-4">No expense records found.</td>
               </tr>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </tbody>
-      </table>
+            <?php else: ?>
+              <?php foreach ($expenses as $idx => $ex): 
+                $alloc = $allocationsMap[$ex['id']] ?? ['clients'=>[],'projects'=>[],'summary'=>'General / Overhead'];
+                $hasCl = !empty($alloc['clients']);
+                $hasPr = !empty($alloc['projects']);
+              ?>
+                <tr>
+                  <td><?= $idx + 1 ?></td>
+                  <td class="fw-semibold text-nowrap"><?= date('d M Y', strtotime($ex['expense_date'])) ?></td>
+                  <td>
+                    <div class="fw-bold text-dark"><?= htmlspecialchars($ex['title']) ?></div>
+                    <?php if (!empty($ex['vendor_name'])): ?>
+                      <small class="text-muted d-block"><i class="bi bi-shop me-1"></i><?= htmlspecialchars($ex['vendor_name']) ?></small>
+                    <?php endif; ?>
+                    <?php if (!empty($ex['description'])): ?>
+                      <small class="text-muted text-truncate d-block" style="max-width:240px;"><?= htmlspecialchars($ex['description']) ?></small>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <span class="badge border" style="background-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>15; color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>; border-color: <?= htmlspecialchars($ex['category_color'] ?: '#0d6efd') ?>40 !important;">
+                      <?= htmlspecialchars($ex['category_name']) ?>
+                    </span>
+                  </td>
+                  <td>
+                    <?php if ($hasCl && $hasPr): ?>
+                      <div class="d-flex flex-column gap-1">
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" title="<?= htmlspecialchars($alloc['summary']) ?>">
+                          <i class="bi bi-people-fill me-1"></i><?= count($alloc['clients']) ?> Clients (₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> ea)
+                        </span>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                          <i class="bi bi-folder-fill me-1"></i><?= count($alloc['projects']) ?> Projects (₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> ea)
+                        </span>
+                      </div>
+                    <?php elseif ($hasCl): ?>
+                      <div>
+                        <span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-50" title="Split equally across selected clients">
+                          <i class="bi bi-person-badge-fill me-1"></i><?= count($alloc['clients']) ?> Client<?= count($alloc['clients']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['clients'][0]['split_amount'] ?? 0, 2) ?> each
+                        </span>
+                        <div class="small text-muted text-truncate mt-1" style="max-width: 220px;" title="<?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], $alloc['clients']))) ?>">
+                          <?= htmlspecialchars(implode(', ', array_map(fn($c)=>$c['client_company'] ?: $c['client_name'], array_slice($alloc['clients'], 0, 2)))) ?><?= count($alloc['clients']) > 2 ? ' +' . (count($alloc['clients']) - 2) . ' more' : '' ?>
+                        </div>
+                      </div>
+                    <?php elseif ($hasPr): ?>
+                      <div>
+                        <span class="badge bg-primary bg-opacity-15 text-primary-emphasis border border-primary border-opacity-50" title="Split equally across selected projects">
+                          <i class="bi bi-folder2 me-1"></i><?= count($alloc['projects']) ?> Project<?= count($alloc['projects']) > 1 ? 's' : '' ?>: ₹<?= number_format($alloc['projects'][0]['split_amount'] ?? 0, 2) ?> each
+                        </span>
+                        <div class="small text-muted text-truncate mt-1" style="max-width: 220px;" title="<?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>">
+                          <?= htmlspecialchars(implode(', ', array_map(fn($p)=>$p['project_name'], $alloc['projects']))) ?>
+                        </div>
+                      </div>
+                    <?php else: ?>
+                      <span class="badge bg-light text-secondary border">
+                        <i class="bi bi-building me-1"></i>General Overhead
+                      </span>
+                    <?php endif; ?>
+                  </td>
+                  <td class="fw-bold text-danger text-end fs-6">₹<?= number_format($ex['amount'], 2) ?></td>
+                  <td>
+                    <span class="badge bg-light text-dark border"><?= strtoupper(str_replace('_',' ',$ex['payment_mode'])) ?></span>
+                    <?php if (!empty($ex['account_name'])): ?>
+                      <div class="small text-muted text-truncate mt-1" style="max-width:140px;">
+                        <i class="bi bi-bank me-1"></i><?= htmlspecialchars($ex['account_name']) ?>
+                      </div>
+                    <?php endif; ?>
+                  </td>
+                  <td><code class="text-dark"><?= htmlspecialchars($ex['reference_no'] ?: '-') ?></code></td>
+                  <td>
+                    <?php if (!empty($ex['receipt_file'])): ?>
+                      <a href="<?= BASE_URL . '/' . htmlspecialchars($ex['receipt_file']) ?>" target="_blank" class="btn btn-sm btn-outline-info p-1 py-0" title="View Uploaded Receipt">
+                        <i class="bi bi-paperclip me-1"></i>Receipt
+                      </a>
+                    <?php else: ?>
+                      <span class="text-muted small">-</span>
+                    <?php endif; ?>
+                  </td>
+                  <td class="text-center text-nowrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Edit Expense" onclick='openEditExpenseModal(<?= json_encode($ex, JSON_HEX_APOS | JSON_HEX_QUOT) ?>, <?= json_encode($alloc, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <form method="POST" class="d-inline" onsubmit="return confirm('Delete expense record: <?= htmlspecialchars($ex['title'], ENT_QUOTES) ?>?');">
+                      <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                      <input type="hidden" name="action" value="delete_expense">
+                      <input type="hidden" name="expense_id" value="<?= $ex['id'] ?>">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Expense"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Modal: Record / Edit Expense -->
 <div class="modal fade" id="addExpenseModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
     <div class="modal-content">
       <form method="POST" enctype="multipart/form-data" id="expenseForm">
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -573,7 +749,10 @@ include __DIR__ . '/../../includes/header.php';
             </div>
             <div class="col-md-6">
               <label class="form-label small fw-semibold">Total Amount (₹) <span class="text-danger">*</span></label>
-              <input type="number" step="0.01" name="amount" id="exp_amount" class="form-control fw-bold text-danger" placeholder="0.00" required oninput="calculateSplitPreview()">
+              <div class="input-group">
+                <span class="input-group-text bg-light text-danger fw-bold">₹</span>
+                <input type="number" step="0.01" name="amount" id="exp_amount" class="form-control fw-bold text-danger" placeholder="0.00" required oninput="calculateSplitPreview()">
+              </div>
             </div>
 
             <!-- Allocation Target (Client / Project / General) -->
@@ -582,31 +761,27 @@ include __DIR__ . '/../../includes/header.php';
                 <label class="form-label small fw-bold text-dark mb-2">
                   <i class="bi bi-diagram-3-fill me-1 text-primary"></i>Expense Allocation &amp; Cost Center:
                 </label>
-                <div class="d-flex flex-wrap gap-3 mb-3">
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="allocation_type" id="alloc_general" value="general" checked onchange="toggleAllocationFields()">
-                    <label class="form-check-label small fw-semibold" for="alloc_general">
-                      General Overhead (Other Expense)
-                    </label>
-                  </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="allocation_type" id="alloc_client" value="client" onchange="toggleAllocationFields()">
-                    <label class="form-check-label small fw-semibold" for="alloc_client">
-                      Specific Client(s) <span class="badge bg-info-subtle text-info border ms-1">Equal Split</span>
-                    </label>
-                  </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="allocation_type" id="alloc_project" value="project" onchange="toggleAllocationFields()">
-                    <label class="form-check-label small fw-semibold" for="alloc_project">
-                      Specific Project(s) <span class="badge bg-primary-subtle text-primary border ms-1">Equal Split</span>
-                    </label>
-                  </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="allocation_type" id="alloc_both" value="both" onchange="toggleAllocationFields()">
-                    <label class="form-check-label small fw-semibold" for="alloc_both">
-                      Both Clients &amp; Projects
-                    </label>
-                  </div>
+                <div class="allocation-pill-group mb-3">
+                  <label class="allocation-pill-btn active" id="pill_alloc_general" for="alloc_general">
+                    <input type="radio" name="allocation_type" id="alloc_general" value="general" checked onchange="toggleAllocationFields()">
+                    <i class="bi bi-building"></i>
+                    <span>General Overhead</span>
+                  </label>
+                  <label class="allocation-pill-btn" id="pill_alloc_client" for="alloc_client">
+                    <input type="radio" name="allocation_type" id="alloc_client" value="client" onchange="toggleAllocationFields()">
+                    <i class="bi bi-person-badge"></i>
+                    <span>Specific Client(s)</span>
+                  </label>
+                  <label class="allocation-pill-btn" id="pill_alloc_project" for="alloc_project">
+                    <input type="radio" name="allocation_type" id="alloc_project" value="project" onchange="toggleAllocationFields()">
+                    <i class="bi bi-folder2"></i>
+                    <span>Specific Project(s)</span>
+                  </label>
+                  <label class="allocation-pill-btn" id="pill_alloc_both" for="alloc_both">
+                    <input type="radio" name="allocation_type" id="alloc_both" value="both" onchange="toggleAllocationFields()">
+                    <i class="bi bi-diagram-3"></i>
+                    <span>Both (Split)</span>
+                  </label>
                 </div>
 
                 <!-- Client Multi-Select Box -->
@@ -687,9 +862,9 @@ include __DIR__ . '/../../includes/header.php';
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Save Expense Record</button>
+        <div class="modal-footer d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-secondary flex-grow-1 flex-sm-grow-0" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary flex-grow-1 flex-sm-grow-0"><i class="bi bi-check-circle me-1"></i>Save Expense Record</button>
         </div>
       </form>
     </div>
@@ -698,7 +873,7 @@ include __DIR__ . '/../../includes/header.php';
 
 <!-- Modal: Manage Expense Categories -->
 <div class="modal fade" id="manageCategoriesModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-tags me-2 text-primary"></i>Manage Expense Categories</h5>
@@ -771,11 +946,77 @@ include __DIR__ . '/../../includes/header.php';
   </div>
 </div>
 
+<!-- Mobile Floating Action Button (FAB) -->
+<button type="button" class="btn btn-primary mobile-fab-btn d-md-none" data-bs-toggle="modal" data-bs-target="#addExpenseModal" onclick="resetExpenseModal()" title="Record Expense" aria-label="Record Expense">
+  <i class="bi bi-plus-lg fs-4"></i>
+</button>
+
 <script>
+function setExpensesView(mode) {
+  const cardsContainer = document.getElementById('expensesCardsContainer');
+  const tableContainer = document.getElementById('expensesTableContainer');
+  const btnCards = document.getElementById('btnViewCards');
+  const btnTable = document.getElementById('btnViewTable');
+
+  if (mode === 'cards') {
+    if (cardsContainer) cardsContainer.classList.remove('d-none');
+    if (tableContainer) tableContainer.classList.add('d-none');
+    if (btnCards) {
+      btnCards.classList.add('active', 'btn-white');
+      btnCards.classList.remove('btn-light', 'text-muted');
+    }
+    if (btnTable) {
+      btnTable.classList.remove('active', 'btn-white');
+      btnTable.classList.add('btn-light', 'text-muted');
+    }
+  } else {
+    if (cardsContainer) cardsContainer.classList.add('d-none');
+    if (tableContainer) tableContainer.classList.remove('d-none');
+    if (btnTable) {
+      btnTable.classList.add('active', 'btn-white');
+      btnTable.classList.remove('btn-light', 'text-muted');
+    }
+    if (btnCards) {
+      btnCards.classList.remove('active', 'btn-white');
+      btnCards.classList.add('btn-light', 'text-muted');
+    }
+    // Re-adjust DataTables columns if table was hidden
+    if (window.jQuery && $.fn && $.fn.DataTable) {
+      $('table.datatable').each(function () {
+        if ($.fn.DataTable.isDataTable(this)) {
+          $(this).DataTable().columns.adjust();
+        }
+      });
+    }
+  }
+  try {
+    localStorage.setItem('trias_expenses_view_mode', mode);
+  } catch(e) {}
+}
+
+// Initialize view preference
+(function initExpensesView() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem('trias_expenses_view_mode');
+  } catch(e) {}
+  if (saved) {
+    setExpensesView(saved);
+  } else {
+    setExpensesView(window.innerWidth < 992 ? 'cards' : 'table');
+  }
+})();
+
 function toggleAllocationFields() {
   const isClient  = document.getElementById('alloc_client').checked;
   const isProject = document.getElementById('alloc_project').checked;
   const isBoth    = document.getElementById('alloc_both').checked;
+  const isGen     = document.getElementById('alloc_general').checked;
+
+  document.getElementById('pill_alloc_general')?.classList.toggle('active', isGen);
+  document.getElementById('pill_alloc_client')?.classList.toggle('active', isClient);
+  document.getElementById('pill_alloc_project')?.classList.toggle('active', isProject);
+  document.getElementById('pill_alloc_both')?.classList.toggle('active', isBoth);
 
   document.getElementById('clientSelectWrapper').style.display  = (isClient || isBoth) ? 'block' : 'none';
   document.getElementById('projectSelectWrapper').style.display = (isProject || isBoth) ? 'block' : 'none';
@@ -889,6 +1130,16 @@ function openEditExpenseModal(ex, alloc) {
   const modal = new bootstrap.Modal(document.getElementById('addExpenseModal'));
   modal.show();
 }
+
+// Select2 modal setup when modal opens
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.jQuery && $.fn.select2) {
+    $('#exp_client_ids, #exp_project_ids').select2({
+      dropdownParent: $('#addExpenseModal'),
+      width: '100%'
+    });
+  }
+});
 </script>
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
