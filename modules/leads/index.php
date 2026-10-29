@@ -61,7 +61,19 @@ if ($filterAssigned === 'unassigned' || $filterAssigned === '0') {
     $sql .= " AND l.assigned_to=?";
     $params[] = (int)$filterAssigned;
 }
-if ($filterSearch)  { $sql .= " AND (l.name LIKE ? OR l.phone LIKE ? OR l.company LIKE ?)"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; $params[] = "%$filterSearch%"; }
+if ($filterSearch) {
+    // Normalize search: strip spaces so "98765 43210" matches "+91 98765 43210", and use LOWER() for case-insensitive matching
+    $searchNormalized = '%' . str_replace(' ', '', strtolower($filterSearch)) . '%';
+    $searchLike = '%' . strtolower($filterSearch) . '%';
+    $sql .= " AND (
+        LOWER(REPLACE(l.name,  ' ', '')) LIKE ?
+        OR LOWER(REPLACE(l.phone, ' ', '')) LIKE ?
+        OR LOWER(REPLACE(l.company, ' ', '')) LIKE ?
+    )";
+    $params[] = $searchNormalized;
+    $params[] = $searchNormalized;
+    $params[] = $searchNormalized;
+}
 
 $sql .= " ORDER BY l.created_at DESC";
 $stmt = $db->prepare($sql); $stmt->execute($params);
